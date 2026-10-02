@@ -142,6 +142,9 @@ export interface Palette {
 const FG_DAY = hex('#535353');
 const FG_DUSK = hex('#2a2328');
 const FG_NIGHT = hex('#e4e4e4');
+const DUSK_SWITCH = 0.0; // sun altitude at the middle of the dark -> light ease
+const DAWN_SWITCH = -0.1; // ... and of the light -> dark ease
+const SWITCH_SPAN = 0.05; // half-width of the ease, in altitude
 
 // The moon appears once the sky is properly dark and is gone before dawn, so it
 // is never up at the same time as the sun.
@@ -154,10 +157,15 @@ export function palette(score: number): Palette {
   const sky = lookup(s.rising ? RISING_RGB : SETTING_RGB, s.a);
   const lum = 0.2126 * sky[0] + 0.7152 * sky[1] + 0.0722 * sky[2];
 
-  // Dark sprites on a light sky, light sprites on a dark one. The flip sits at the
-  // perceptual midpoint so contrast stays readable all through dusk and dawn.
+  // Sprites are dark shapes while there is sunlight and light shapes in the dark.
+  // The switch is a short ease tied to the sun, centred where the sky sits between
+  // the two sprite colours: at dusk as the sun slips behind the ground, at dawn as
+  // the first light appears (a little before sunrise).
+  const light = s.rising
+    ? 1 - smooth(DAWN_SWITCH - SWITCH_SPAN, DAWN_SWITCH + SWITCH_SPAN, s.a)
+    : 1 - smooth(DUSK_SWITCH - SWITCH_SPAN, DUSK_SWITCH + SWITCH_SPAN, s.a);
   const dark = mix(FG_DUSK, FG_DAY, smooth(0.8, 0.95, lum));
-  const fg = mix(FG_NIGHT, dark, smooth(0.46, 0.5, lum));
+  const fg = mix(dark, FG_NIGHT, light);
 
   const sinceSet = s.q - DAY;
   const moonU = (sinceSet - MOON_FROM) / (MOON_TO - MOON_FROM);
