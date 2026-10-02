@@ -135,6 +135,10 @@ function moon(): Bmp {
   });
 }
 
+function sun(): Bmp {
+  return new Bmp(24, 24).rule((x, y) => (x - 12) ** 2 + (y - 12) ** 2 <= 11.5 ** 2);
+}
+
 function star(big: boolean): Bmp {
   if (big) return new Bmp(9, 9).add(4, 0, 1, 9).add(0, 4, 9, 1).add(3, 3, 3, 3);
   return new Bmp(5, 5).add(2, 0, 1, 5).add(0, 2, 5, 1);
@@ -225,6 +229,7 @@ const defs = {
   pteroDown: ptero(false),
   cloud: cloud(),
   moon: moon(),
+  sun: sun(),
   starBig: star(true),
   starSmall: star(false),
   ground: ground(),

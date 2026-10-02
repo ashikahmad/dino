@@ -1,4 +1,4 @@
-import { palette } from './cycle';
+import { MOON, moonBody, palette, sunBody, sunColor } from './cycle';
 import { Renderer, VIEW_W, type RGB } from './renderer';
 import { GROUND_W, type Sprite, type SpriteName } from './sprites';
 
@@ -356,15 +356,18 @@ export class Game {
     document.body.style.background = rgbCss(pal.sky);
     r.begin(pal.sky);
 
-    // stars + moon (night only)
+    // sky: stars, sun and moon, clipped so they rise from behind the ground line
     if (pal.night > 0.01) {
       for (const s of this.stars) {
         const x = (((s.x - this.starDrift) % VIEW_W) + VIEW_W) % VIEW_W;
         r.draw(s.big ? S.starBig : S.starSmall, x, s.y, pal.fg, pal.night);
       }
-      const t = Math.min(1, Math.max(0, (pal.p - 0.5) / 0.45));
-      r.draw(S.moon, 520 - t * 460, 22, pal.fg, pal.night);
     }
+    const sun = sunBody(pal.p);
+    if (sun) r.draw(S.sun, sun.x, sun.y, sunColor(sun.h));
+    const moon = moonBody(pal.p);
+    if (moon) r.draw(S.moon, moon.x, moon.y, MOON);
+    r.flush(GROUND_Y);
 
     for (const c of this.clouds) r.draw(S.cloud, c.x, c.y, pal.cloud);
 
@@ -385,7 +388,7 @@ export class Game {
       this.text('GAME OVER', Math.round((VIEW_W - 9 * 12 + 2) / 2), 40, pal.fg);
       r.draw(S.restart, (VIEW_W - 36) / 2, 70, pal.fg);
     }
-    r.end();
+    r.flush();
   }
 
   private renderDino(c: RGB): void {

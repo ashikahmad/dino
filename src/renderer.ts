@@ -131,8 +131,18 @@ export class Renderer {
     this.count++;
   }
 
-  end(): void {
+  /**
+   * Draw everything queued so far. With clipY, only the part of the batch above
+   * that logical y is kept (used so the sun and moon rise from behind the ground).
+   */
+  flush(clipY?: number): void {
     const gl = this.gl;
+    if (this.count === 0) return;
+    if (clipY !== undefined) {
+      const h = Math.round(clipY * this.scale);
+      gl.enable(gl.SCISSOR_TEST);
+      gl.scissor(0, this.canvas.height - h, this.canvas.width, h);
+    }
     const a = this.bufferInfo.attribs!;
     twgl.setAttribInfoBufferFromArray(gl, a.a_pos, this.pos);
     twgl.setAttribInfoBufferFromArray(gl, a.a_uv, this.uv);
@@ -141,6 +151,8 @@ export class Renderer {
     twgl.setBuffersAndAttributes(gl, this.programInfo, this.bufferInfo);
     twgl.setUniforms(this.programInfo, { u_view: [VIEW_W, VIEW_H], u_tex: this.texture });
     twgl.drawBufferInfo(gl, this.bufferInfo, gl.TRIANGLES, this.count * 6);
+    gl.disable(gl.SCISSOR_TEST);
+    this.count = 0;
   }
 
   get pixelScale(): number {
