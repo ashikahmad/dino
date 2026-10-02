@@ -127,10 +127,10 @@ function cloud(): Bmp {
 }
 
 function moon(): Bmp {
-  // crescent: a disc minus an offset disc, clipped to the left half
-  return new Bmp(20, 40).rule((x, y) => {
-    const a = (x - 20) ** 2 + (y - 20) ** 2 <= 19.5 ** 2;
-    const c = (x - 27) ** 2 + (y - 20) ** 2 <= 17 ** 2;
+  // same diameter as the sun: a disc minus an offset disc leaves a crescent
+  return new Bmp(24, 24).rule((x, y) => {
+    const a = (x - 12) ** 2 + (y - 12) ** 2 <= 11.5 ** 2;
+    const c = (x - 17.5) ** 2 + (y - 12) ** 2 <= 10.5 ** 2;
     return a && !c;
   });
 }

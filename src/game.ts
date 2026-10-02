@@ -1,4 +1,4 @@
-import { MOON, mix, moonBody, palette, sunBody, sunColor } from './cycle';
+import { MOON, mix, palette } from './cycle';
 import { Renderer, VIEW_W, type RGB } from './renderer';
 import { GROUND_W, type Sprite, type SpriteName } from './sprites';
 
@@ -189,14 +189,11 @@ export class Game {
   update(dtMs: number): void {
     dtMs = Math.min(dtMs, 100);
     this.now += dtMs;
-    if (this.state === 'crashed') return;
+    if (this.state !== 'running') return; // idle and game-over screens are frozen
     const df = dtMs / FRAME_MS;
 
-    // clouds and stars keep drifting even before the first jump
     this.updateClouds(df);
-    this.starDrift = (this.starDrift + 0.3 * df * (this.state === 'running' ? 1 : 0.3)) % VIEW_W;
-
-    if (this.state !== 'running') return;
+    this.starDrift = (this.starDrift + 0.3 * df) % VIEW_W;
 
     this.runningTime += dtMs;
     this.groundX = (this.groundX + this.speed * df) % GROUND_W;
@@ -364,10 +361,8 @@ export class Game {
         r.draw(s.big ? S.starBig : S.starSmall, x, s.y, pal.fg, pal.night);
       }
     }
-    const sun = sunBody(pal.p);
-    if (sun) r.draw(S.sun, sun.x, sun.y, mix(pal.sky, sunColor(sun.h), SKY_BODY_FADE));
-    const moon = moonBody(pal.p);
-    if (moon) r.draw(S.moon, moon.x, moon.y, mix(pal.sky, MOON, SKY_BODY_FADE));
+    if (pal.sun) r.draw(S.sun, pal.sun.x, pal.sun.y, mix(pal.sky, pal.sun.color, SKY_BODY_FADE));
+    if (pal.moon) r.draw(S.moon, pal.moon.x, pal.moon.y, mix(pal.sky, MOON, SKY_BODY_FADE));
     r.flush(GROUND_Y);
 
     for (const c of this.clouds) r.draw(S.cloud, c.x, c.y, pal.cloud);
