@@ -62,7 +62,7 @@ export function palette(score: number): Palette {
   const lum = 0.2126 * sky[0] + 0.7152 * sky[1] + 0.0722 * sky[2];
   // Keyframes hold the dark foreground; swap to the light one only once the sky is
   // dark enough, so contrast stays readable through dusk and dawn.
-  const dark = smooth(0.19, 0.21, lum);
+  const dark = smooth(0.46, 0.5, lum);
   const fg = mix(LIGHT_FG, mix(a.fg, b.fg, t), dark);
   const night = Math.min(1, Math.max(0, (0.45 - lum) / 0.3));
   return { p, sky, fg, cloud: mix(sky, fg, 0.25), dim: mix(sky, fg, 0.75), night };

@@ -1,4 +1,4 @@
-import { MOON, moonBody, palette, sunBody, sunColor } from './cycle';
+import { MOON, mix, moonBody, palette, sunBody, sunColor } from './cycle';
 import { Renderer, VIEW_W, type RGB } from './renderer';
 import { GROUND_W, type Sprite, type SpriteName } from './sprites';
 
@@ -22,6 +22,7 @@ const GROUND_Y = 139; // the line the dino stands on (feet end here)
 const DINO_H = 47;
 const DUCK_H = 30;
 const MAX_CLOUDS = 6;
+const SKY_BODY_FADE = 0.4; // sun/moon are backdrop: blend them toward the sky colour
 
 type Box = [number, number, number, number]; // x, y, w, h relative to the sprite
 
@@ -364,9 +365,9 @@ export class Game {
       }
     }
     const sun = sunBody(pal.p);
-    if (sun) r.draw(S.sun, sun.x, sun.y, sunColor(sun.h));
+    if (sun) r.draw(S.sun, sun.x, sun.y, mix(pal.sky, sunColor(sun.h), SKY_BODY_FADE));
     const moon = moonBody(pal.p);
-    if (moon) r.draw(S.moon, moon.x, moon.y, MOON);
+    if (moon) r.draw(S.moon, moon.x, moon.y, mix(pal.sky, MOON, SKY_BODY_FADE));
     r.flush(GROUND_Y);
 
     for (const c of this.clouds) r.draw(S.cloud, c.x, c.y, pal.cloud);
