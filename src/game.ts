@@ -1,4 +1,4 @@
-import { MOON, NIGHT_START, mix, palette, safeAfter } from './cycle';
+import { MOON, NIGHT_START, mix, palette, safeAfter, type Palette } from './cycle';
 import { Renderer, VIEW_W, type RGB } from './renderer';
 import { GROUND_W, type Sprite, type SpriteName } from './sprites';
 
@@ -21,6 +21,7 @@ const DINO_X = 50;
 const GROUND_Y = 139; // the line the dino stands on (feet end here)
 const DINO_H = 47;
 const DUCK_H = 30;
+const FLASH_MS = 100; // one negative flash when the dino is hit
 const NUDGE_MS = 500; // game-over transition that steps the sky out of a low-contrast moment
 const MAX_CLOUDS = 6;
 const SKY_BODY_FADE = 0.4; // sun/moon are backdrop: blend them toward the sky colour
@@ -89,6 +90,7 @@ export class Game {
   private crashClock = 0;
   private nudgeTo = 0;
   private nudgeT = NUDGE_MS;
+  private flashOnCrash = true;
   private highScore = 0;
   private runningTime = 0;
   private crashedAt = 0;
@@ -227,6 +229,7 @@ export class Game {
     if (this.obstacles.length && this.collides()) {
       this.state = 'crashed';
       this.crashedAt = this.now;
+      this.flashOnCrash = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       this.crashClock = this.clockBase + this.score;
       this.nudgeTo = safeAfter(this.crashClock);
       this.nudgeT = 0;
@@ -376,7 +379,7 @@ export class Game {
     const r = this.r;
     const S = r.sprites;
     // Cycle is score-based: frozen on game over, restarts with the score.
-    const pal = palette(this.clock());
+    const pal = this.withHitFlash(palette(this.clock()));
     document.body.style.background = rgbCss(pal.sky);
     r.begin(pal.sky);
 
@@ -411,6 +414,18 @@ export class Game {
       r.draw(S.restart, (VIEW_W - 36) / 2, 70, pal.fg);
     }
     r.flush();
+  }
+
+  /**
+   * For a split second after a hit, swap the sky and sprite colours (a negative frame,
+   * like the Duck Hunt screen flash). Softer at night so it is not a white-out.
+   */
+  private withHitFlash(pal: Palette): Palette {
+    if (this.state !== 'crashed' || !this.flashOnCrash || this.now - this.crashedAt >= FLASH_MS) return pal;
+    const k = 1 - 0.4 * pal.night;
+    const sky = mix(pal.sky, pal.fg, k);
+    const fg = mix(pal.fg, pal.sky, k);
+    return { ...pal, sky, fg, cloud: mix(sky, fg, 0.25), dim: mix(sky, fg, 0.75) };
   }
 
   private renderDino(c: RGB): void {
