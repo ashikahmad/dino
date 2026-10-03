@@ -1,4 +1,4 @@
-import { MOON, mix, palette } from './cycle';
+import { MOON, NIGHT_START, mix, palette, safeAfter } from './cycle';
 import { Renderer, VIEW_W, type RGB } from './renderer';
 import { GROUND_W, type Sprite, type SpriteName } from './sprites';
 
@@ -21,6 +21,7 @@ const DINO_X = 50;
 const GROUND_Y = 139; // the line the dino stands on (feet end here)
 const DINO_H = 47;
 const DUCK_H = 30;
+const NUDGE_MS = 500; // game-over transition that steps the sky out of a low-contrast moment
 const MAX_CLOUDS = 6;
 const SKY_BODY_FADE = 0.4; // sun/moon are backdrop: blend them toward the sky colour
 
@@ -83,6 +84,11 @@ export class Game {
   private speed = START_SPEED;
   private distance = 0;
   private score = 0;
+  // Where on the day/night cycle this run began. Runs carry on from where the last one ended.
+  private clockBase = 0;
+  private crashClock = 0;
+  private nudgeTo = 0;
+  private nudgeT = NUDGE_MS;
   private highScore = 0;
   private runningTime = 0;
   private crashedAt = 0;
@@ -124,6 +130,18 @@ export class Game {
     }
     this.clouds.push({ x: rand(100, 500), y: rand(30, 71) });
     this.cloudGap = rand(100, 400);
+  }
+
+  /** Before the first run, start in the night for dark-mode users and in the day otherwise. */
+  setPreferDark(dark: boolean): void {
+    if (this.state === 'idle') this.clockBase = dark ? NIGHT_START : 0;
+  }
+
+  private clock(): number {
+    if (this.state !== 'crashed') return this.clockBase + this.score;
+    const k = this.nudgeT / NUDGE_MS;
+    const ease = 1 - (1 - k) ** 3;
+    return this.crashClock + (this.nudgeTo - this.crashClock) * ease;
   }
 
   /** Jump ahead in score (used for testing the day cycle). */
@@ -169,6 +187,7 @@ export class Game {
   }
 
   private restart(): void {
+    this.clockBase = this.clock();
     this.state = 'running';
     this.speed = START_SPEED;
     this.distance = 0;
@@ -189,7 +208,11 @@ export class Game {
   update(dtMs: number): void {
     dtMs = Math.min(dtMs, 100);
     this.now += dtMs;
-    if (this.state !== 'running') return; // idle and game-over screens are frozen
+    if (this.state === 'crashed') {
+      this.nudgeT = Math.min(NUDGE_MS, this.nudgeT + dtMs);
+      return;
+    }
+    if (this.state !== 'running') return; // the idle screen is frozen
     const df = dtMs / FRAME_MS;
 
     this.updateClouds(df);
@@ -204,6 +227,9 @@ export class Game {
     if (this.obstacles.length && this.collides()) {
       this.state = 'crashed';
       this.crashedAt = this.now;
+      this.crashClock = this.clockBase + this.score;
+      this.nudgeTo = safeAfter(this.crashClock);
+      this.nudgeT = 0;
       this.flashing = false;
       this.jumping = false;
       this.ducking = false;
@@ -350,7 +376,7 @@ export class Game {
     const r = this.r;
     const S = r.sprites;
     // Cycle is score-based: frozen on game over, restarts with the score.
-    const pal = palette(this.score);
+    const pal = palette(this.clock());
     document.body.style.background = rgbCss(pal.sky);
     r.begin(pal.sky);
 

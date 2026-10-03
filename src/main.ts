@@ -6,6 +6,11 @@ const renderer = new Renderer(canvas);
 const game = new Game(renderer);
 (window as unknown as { dino: Game }).dino = game;
 
+// Start the day/night cycle to match the viewer's surroundings.
+const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+game.setPreferDark(prefersDark.matches);
+prefersDark.addEventListener('change', (e) => game.setPreferDark(e.matches));
+
 const resize = () => renderer.resize();
 window.addEventListener('resize', resize);
 resize();

@@ -27,7 +27,7 @@ const smooth = (a: number, b: number, x: number) => {
 // The sky colour is looked up from `a`, so the colour changes happen when the
 // sun is actually near the ground instead of on fixed linear phases.
 
-const DAY = 0.62; // fraction of the cycle the sun is up
+const DAY = 0.5; // fraction of the cycle the sun is up: day and night are the same length
 const SUNRISE = 1 - 0.3 * DAY; // the game starts a little after sunrise, sun already high
 const TWILIGHT = 0.08; // cycles from the sun touching the ground to full night
 const DEEPEST = -0.3; // altitude at which the sky is fully dark
@@ -151,8 +151,9 @@ const SWITCH_SPAN = 0.05; // half-width of the ease, in altitude
 const MOON_FROM = 0.075; // cycles after sunset
 const MOON_TO = 1 - DAY - 0.06;
 
-export function palette(score: number): Palette {
-  const p = (((score % CYCLE_POINTS) + CYCLE_POINTS) % CYCLE_POINTS) / CYCLE_POINTS;
+/** `position` is a point on the day/night cycle, in score points (it wraps every CYCLE_POINTS). */
+export function palette(position: number): Palette {
+  const p = (((position % CYCLE_POINTS) + CYCLE_POINTS) % CYCLE_POINTS) / CYCLE_POINTS;
   const s = sunState(p);
   const sky = lookup(s.rising ? RISING_RGB : SETTING_RGB, s.a);
   const lum = 0.2126 * sky[0] + 0.7152 * sky[1] + 0.0722 * sky[2];
@@ -179,4 +180,29 @@ export function palette(score: number): Palette {
     sun: s.h > 0 ? { ...arc(s.q / DAY), color: sunColor(s.h, s.rising) } : null,
     moon: moonU >= 0 && moonU <= 1 ? arc(moonU) : null,
   };
+}
+
+/** Cycle position where the sky first turns fully black after sunset: the longest stretch of night ahead. */
+export const NIGHT_START = ((SUNRISE + DAY + TWILIGHT) % 1) * CYCLE_POINTS;
+
+const MIN_CONTRAST = 3;
+
+function contrast(a: RGB, b: RGB): number {
+  const lin = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const lum = (c: RGB) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+  const x = lum(a) + 0.05, y = lum(b) + 0.05;
+  return Math.max(x, y) / Math.min(x, y);
+}
+
+/**
+ * The first position at or after `position` where the sprites stand out from the sky.
+ * The sprite colour fades through the sky's brightness at dusk and dawn; this steps
+ * past that short stretch (about 20 points) so a new run never starts inside it.
+ */
+export function safeAfter(position: number): number {
+  for (let d = 0; d <= 60; d++) {
+    const pal = palette(position + d);
+    if (contrast(pal.sky, pal.fg) >= MIN_CONTRAST) return position + d;
+  }
+  return position;
 }
