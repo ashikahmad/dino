@@ -96,12 +96,24 @@ const shareLabel = document.getElementById('share-label') as HTMLSpanElement;
 let aboutOpen = false;
 const isAboutOpen = () => aboutOpen;
 
+let overlayTimer = 0;
 function syncPanel(): void {
   const idle = game.status === 'idle';
-  panel.classList.toggle('overlay', aboutOpen);
   panel.classList.toggle('hidden', !idle && !aboutOpen);
+  if (aboutOpen || idle) {
+    // the card layout while the card is open, the start-screen layout while idle
+    window.clearTimeout(overlayTimer);
+    overlayTimer = 0;
+    panel.classList.toggle('overlay', aboutOpen);
+  } else if (panel.classList.contains('overlay') && !overlayTimer) {
+    // closed over the game-over screen: let the card fade out where it is, then drop its layout
+    overlayTimer = window.setTimeout(() => {
+      overlayTimer = 0;
+      if (!aboutOpen) panel.classList.remove('overlay');
+    }, 400);
+  }
   // the About card is one tap away after a crash, and on the start screen when it cannot show everything
-  const reachable = game.status === 'crashed' || (game.status === 'idle' && room !== 'full');
+  const reachable = game.status === 'crashed' || (idle && room !== 'full');
   infoButton.hidden = aboutOpen || !reachable;
 }
 function openAbout(): void {
