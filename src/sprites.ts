@@ -41,6 +41,22 @@ const moon = () =>
     (x, y) => (x - 12) ** 2 + (y - 12) ** 2 <= 11.5 ** 2 && !((x - 17.5) ** 2 + (y - 12) ** 2 <= 10.5 ** 2),
   );
 
+/** Fill each column between a shape's top and bottom edge: the solid body of an outline. */
+function silhouette(rows: readonly string[]): Bmp {
+  const b = Bmp.fromRows(rows);
+  for (let x = 0; x < b.w; x++) {
+    let top = -1, bottom = -1;
+    for (let y = 0; y < b.h; y++) {
+      if (b.px[y * b.w + x]) {
+        if (top < 0) top = y;
+        bottom = y;
+      }
+    }
+    for (let y = top; top >= 0 && y <= bottom; y++) b.px[y * b.w + x] = 1;
+  }
+  return b;
+}
+
 const { digits, letters, ...art } = ART;
 
 const defs = {
@@ -50,6 +66,8 @@ const defs = {
   >),
   moon: moon(),
   sun: sun(),
+  // The original cloud is an outline; filling it makes it solid so the sun, moon and stars pass behind it.
+  cloud: silhouette(ART.cloud),
 };
 
 export type SpriteName = keyof typeof defs;
