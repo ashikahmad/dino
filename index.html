@@ -59,21 +59,15 @@
       @media (max-height: 640px) { #panel:not(.overlay) .tagline, #panel:not(.overlay) .credit { display: none; } }
       @media (max-height: 480px) { #panel:not(.overlay) .bottom { display: none; } }
       @media (prefers-reduced-motion: reduce) { #panel, #panel.hidden { transition: none; } }
-      #fs { position: fixed; top: calc(8px + env(safe-area-inset-top, 0px)); right: calc(48px + env(safe-area-inset-right, 0px)); width: 40px; height: 40px; padding: 9px; border: 0; background: none; color: inherit; opacity: 0.55; cursor: pointer; z-index: 6; }
-      #fs:hover, #fs:focus-visible { opacity: 0.9; }
-      #fs svg { display: block; width: 100%; height: 100%; }
       #fs .exit { display: none; }
       #fs[aria-pressed="true"] .enter { display: none; }
       #fs[aria-pressed="true"] .exit { display: block; }
-      #fs[hidden] { display: none; }
       .hint { margin: 0; font-size: 12px; opacity: 0.65; }
-      #info { position: fixed; top: calc(8px + env(safe-area-inset-top, 0px)); right: calc(88px + env(safe-area-inset-right, 0px)); width: 40px; height: 40px; padding: 9px; border: 0; background: none; color: inherit; opacity: 0.55; cursor: pointer; z-index: 6; }
-      #info:hover, #info:focus-visible { opacity: 0.9; }
-      #info svg { display: block; width: 100%; height: 100%; }
-      #info[hidden] { display: none; }
-      #mute { position: fixed; top: calc(8px + env(safe-area-inset-top, 0px)); right: calc(8px + env(safe-area-inset-right, 0px)); width: 40px; height: 40px; padding: 8px; border: 0; background: none; color: inherit; opacity: 0.55; cursor: pointer; }
-      #mute:hover, #mute:focus-visible { opacity: 0.9; }
-      #mute svg { display: block; width: 100%; height: 100%; }
+      #bar { position: fixed; top: calc(8px + env(safe-area-inset-top, 0px)); right: calc(8px + env(safe-area-inset-right, 0px)); z-index: 4; display: flex; }
+      #bar button { width: 40px; height: 40px; padding: 8px; border: 0; background: none; color: inherit; opacity: 0.55; cursor: pointer; }
+      #bar button:hover, #bar button:focus-visible { opacity: 0.9; }
+      #bar button[hidden] { display: none; }
+      #bar svg { display: block; width: 100%; height: 100%; }
       #mute .off { display: none; }
       #mute[aria-pressed="true"] .on { display: none; }
       #mute[aria-pressed="true"] .off { display: block; }
@@ -81,21 +75,23 @@
   </head>
   <body>
     <canvas id="game"></canvas>
-    <button id="mute" type="button" tabindex="-1" aria-label="Sound" aria-pressed="false" title="Sound on/off (M)">
-      <svg class="on" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M3 9h4l5-4v14l-5-4H3z" /><path d="M15 8.5a5 5 0 0 1 0 7M17.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-      </svg>
-      <svg class="off" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M3 9h4l5-4v14l-5-4H3z" /><path d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-      </svg>
-    </button>
-    <button id="fs" type="button" tabindex="-1" aria-label="Enter fullscreen" aria-pressed="false" title="Fullscreen (F)" hidden>
-      <svg class="enter" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" /></svg>
-      <svg class="exit" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5" /></svg>
-    </button>
-    <button id="info" type="button" tabindex="-1" aria-label="About this game" title="About (I)" hidden>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2" /><rect x="11" y="10.5" width="2" height="7" fill="currentColor" /><rect x="11" y="6.5" width="2" height="2.2" fill="currentColor" /></svg>
-    </button>
+    <div id="bar">
+      <button id="info" type="button" tabindex="-1" aria-label="About this game" title="About (I)" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="2" /><rect x="11" y="10.5" width="2" height="7" fill="currentColor" /><rect x="11" y="6.5" width="2" height="2.2" fill="currentColor" /></svg>
+      </button>
+      <button id="mute" type="button" tabindex="-1" aria-label="Sound" aria-pressed="false" title="Sound on/off (M)">
+        <svg class="on" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M3 9h4l5-4v14l-5-4H3z" /><path d="M15 8.5a5 5 0 0 1 0 7M17.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        </svg>
+        <svg class="off" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M3 9h4l5-4v14l-5-4H3z" /><path d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        </svg>
+      </button>
+      <button id="fs" type="button" tabindex="-1" aria-label="Enter fullscreen" aria-pressed="false" title="Fullscreen (F)" hidden>
+        <svg class="enter" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" /></svg>
+        <svg class="exit" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5" /></svg>
+      </button>
+    </div>
     <div id="panel" role="dialog" aria-label="About Dino">
       <button class="close" id="close" type="button" aria-label="Close">&times;</button>
       <div class="top">
