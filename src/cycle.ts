@@ -151,11 +151,8 @@ const SWITCH_SPAN = 0.05; // half-width of the ease, in altitude
 const MOON_FROM = 0.075; // cycles after sunset
 const MOON_TO = 1 - DAY - 0.06;
 
-// TEMP: start the game at midnight so the sunrise can be tuned. Set back to 0 for the normal start.
-const START_OFFSET = 936;
-
 export function palette(score: number): Palette {
-  const p = ((((score + START_OFFSET) % CYCLE_POINTS) + CYCLE_POINTS) % CYCLE_POINTS) / CYCLE_POINTS;
+  const p = (((score % CYCLE_POINTS) + CYCLE_POINTS) % CYCLE_POINTS) / CYCLE_POINTS;
   const s = sunState(p);
   const sky = lookup(s.rising ? RISING_RGB : SETTING_RGB, s.a);
   const lum = 0.2126 * sky[0] + 0.7152 * sky[1] + 0.0722 * sky[2];
