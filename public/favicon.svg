@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" shape-rendering="crispEdges">
+  <style>
+    .tile { fill: #f7f7f7; }
+    .dino { fill: #535353; }
+    @media (prefers-color-scheme: dark) { .tile { fill: #202124; } .dino { fill: #e4e4e4; } }
+  </style>
+  <rect class="tile" width="24" height="24" rx="4" />
+  <path class="dino" d="M13 1h8v1h-8zM12 2h2v1h-2zM15 2h7v1h-7zM12 3h2v1h-2zM15 3h7v1h-7zM12 4h10v1h-10zM12 5h10v1h-10zM12 6h5v1h-5zM12 7h5v1h-5zM12 8h4v1h-4zM2 9h1v1h-1zM11 9h5v1h-5zM2 10h1v1h-1zM9 10h7v1h-7zM2 11h2v1h-2zM8 11h8v1h-8zM17 11h1v1h-1zM2 12h3v1h-3zM7 12h9v1h-9zM2 13h14v1h-14zM3 14h13v1h-13zM4 15h11v1h-11zM5 16h9v1h-9zM6 17h7v1h-7zM7 18h3v1h-3zM11 18h2v1h-2zM7 19h2v1h-2zM12 19h1v1h-1zM7 20h1v1h-1zM12 20h1v1h-1zM7 21h1v1h-1zM12 21h1v1h-1z" />
+</svg>
