@@ -394,14 +394,16 @@ export class Game {
     r.begin(pal.sky);
 
     // sky: stars, sun and moon, clipped so they rise from behind the ground line
+    // the stars use the moon's tone so the two sit together
+    const moonTone = mix(pal.sky, MOON, MOON_FADE);
     if (pal.night > 0.01) {
       for (const s of this.stars) {
         const x = (((s.x - this.starDrift) % VIEW_W) + VIEW_W) % VIEW_W;
-        r.draw(s.alt ? S.star2 : S.star1, x, s.y, pal.fg, pal.night);
+        r.draw(s.alt ? S.star2 : S.star1, x, s.y, moonTone, pal.night);
       }
     }
     if (pal.sun) r.draw(S.sun, pal.sun.x, pal.sun.y, mix(pal.sky, pal.sun.color, SKY_BODY_FADE));
-    if (pal.moon) r.draw(S.moon, pal.moon.x, pal.moon.y, mix(pal.sky, MOON, MOON_FADE));
+    if (pal.moon) r.draw(S.moon, pal.moon.x, pal.moon.y, moonTone);
     r.flush(GROUND_LINE_Y);
 
     for (const c of this.clouds) r.draw(S.cloud, c.x, c.y, pal.cloud);
