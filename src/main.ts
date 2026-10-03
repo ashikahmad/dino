@@ -11,9 +11,17 @@ const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
 game.setPreferDark(prefersDark.matches);
 prefersDark.addEventListener('change', (e) => game.setPreferDark(e.matches));
 
+const panel = document.getElementById('panel') as HTMLDivElement;
+// How much room there is above and below the canvas decides what the start screen can show.
+type Room = 'full' | 'compact' | 'tight';
+let room: Room = 'full';
 const resize = () => {
   renderer.resize();
   document.documentElement.style.setProperty('--canvas-h', canvas.style.height);
+  const free = Math.max(0, (window.innerHeight - parseFloat(canvas.style.height)) / 2);
+  room = free >= 145 ? 'full' : free >= 90 ? 'compact' : 'tight';
+  panel.dataset.room = room;
+  panel.style.setProperty('--room', `${free}px`);
 };
 window.addEventListener('resize', resize);
 resize();
@@ -79,7 +87,6 @@ const standalone = window.matchMedia('(display-mode: standalone), (display-mode:
 (document.getElementById('ios-hint') as HTMLElement).hidden = !(isIPhone && !canFullscreen && !standalone);
 
 // ---------------------------------------------------------------- start screen and about card
-const panel = document.getElementById('panel') as HTMLDivElement;
 const infoButton = document.getElementById('info') as HTMLButtonElement;
 const closeButton = document.getElementById('close') as HTMLButtonElement;
 const shareButton = document.getElementById('share') as HTMLButtonElement;
@@ -93,7 +100,9 @@ function syncPanel(): void {
   const idle = game.status === 'idle';
   panel.classList.toggle('overlay', aboutOpen);
   panel.classList.toggle('hidden', !idle && !aboutOpen);
-  infoButton.hidden = game.status !== 'crashed' || aboutOpen;
+  // the About card is one tap away after a crash, and on the start screen when it cannot show everything
+  const reachable = game.status === 'crashed' || (game.status === 'idle' && room !== 'full');
+  infoButton.hidden = aboutOpen || !reachable;
 }
 function openAbout(): void {
   aboutOpen = true;
@@ -165,7 +174,7 @@ window.addEventListener('keydown', (e) => {
     toggleFullscreen();
     return;
   }
-  if (e.code === 'KeyI' && game.status === 'crashed' && !e.repeat) {
+  if (e.code === 'KeyI' && !e.repeat && (game.status === 'crashed' || (game.status === 'idle' && room !== 'full'))) {
     openAbout();
     return;
   }

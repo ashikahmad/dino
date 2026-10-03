@@ -34,12 +34,12 @@
       /* start screen and about card: one panel, shown around the canvas while idle and as an overlay on request */
       body { color: #535353; }
       @media (prefers-color-scheme: dark) { body { color: #e4e4e4; } }
-      #panel { position: fixed; inset: 0; z-index: 5; display: grid; grid-template-rows: 1fr var(--canvas-h, 150px) 1fr; justify-items: center; padding-inline: 16px; text-align: center; pointer-events: none; transition: opacity 0.35s ease; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+      #panel { position: fixed; inset: 0; z-index: 5; display: grid; grid-template-rows: minmax(0, 1fr) var(--canvas-h, 150px) minmax(0, 1fr); justify-items: center; padding-inline: 16px; text-align: center; pointer-events: none; transition: opacity 0.35s ease; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
       #panel.hidden { opacity: 0; visibility: hidden; transition: opacity 0.35s ease, visibility 0s linear 0.35s; }
       #panel .top { align-self: end; display: grid; justify-items: center; gap: 10px; padding-bottom: 20px; }
       #panel .bottom { align-self: start; display: grid; justify-items: center; gap: 14px; padding-top: 20px; max-width: 560px; }
       .title { margin: 0; line-height: 0; }
-      .title svg { display: block; width: min(clamp(150px, 34vw, 300px), calc((100dvh - var(--canvas-h, 150px)) / 2 * 0.62 * 32 / 9)); height: auto; fill: currentColor; shape-rendering: crispEdges; }
+      .title svg { display: block; width: max(120px, min(clamp(150px, 34vw, 300px), calc(var(--room, 200px) * 0.62 * 32 / 9))); height: auto; fill: currentColor; shape-rendering: crispEdges; }
       .tagline { margin: 0; opacity: 0.7; letter-spacing: 0.04em; }
       .how { margin: 0; opacity: 0.85; }
       .how.touch { display: none; }
@@ -56,8 +56,16 @@
       #panel.overlay .top, #panel.overlay .bottom { padding: 0; align-self: center; }
       #panel.overlay .spacer { display: none; }
       #panel.overlay .close { display: block; }
-      @media (max-height: 640px) { #panel:not(.overlay) .tagline, #panel:not(.overlay) .credit { display: none; } }
-      @media (max-height: 480px) { #panel:not(.overlay) .bottom { display: none; } }
+      /* how much room there is above and below the canvas decides what the start screen shows (set in main.ts) */
+      #panel .spacer { display: flex; align-items: center; justify-content: center; padding-bottom: 14%; }
+      .sky-how { display: none; margin: 0; padding-inline: 12px; font-size: 13px; opacity: 0.9; text-shadow: 0 0 8px var(--sky, #f7f7f7), 0 0 3px var(--sky, #f7f7f7); }
+      #panel[data-room="compact"]:not(.overlay) :is(.tagline, .credit, .hint) { display: none; }
+      #panel[data-room="compact"]:not(.overlay) .bottom { gap: 8px; padding-top: 12px; }
+      #panel[data-room="compact"]:not(.overlay) .pill { padding: 5px 12px; font-size: 13px; }
+      #panel[data-room="tight"]:not(.overlay) :is(.tagline, .bottom) { display: none; }
+      #panel[data-room="tight"]:not(.overlay) .top { padding-bottom: 6px; margin-bottom: min(0px, calc(var(--room, 200px) - 44px)); }
+      #panel[data-room="tight"]:not(.overlay) .sky-how.keys { display: block; }
+      @media (pointer: coarse) { #panel[data-room="tight"]:not(.overlay) .sky-how.keys { display: none; } #panel[data-room="tight"]:not(.overlay) .sky-how.touch { display: block; } }
       @media (prefers-reduced-motion: reduce) { #panel, #panel.hidden { transition: none; } }
       #fs .exit { display: none; }
       #fs[aria-pressed="true"] .enter { display: none; }
@@ -98,7 +106,10 @@
         <h1 class="title"><svg viewBox="0 0 32 9" role="img" aria-label="Dino"><path d="M0 0h6v1h-6zM0 1h2v1h-2zM4 1h3v1h-3zM0 2h2v1h-2zM5 2h2v1h-2zM0 3h2v1h-2zM5 3h2v1h-2zM0 4h2v1h-2zM5 4h2v1h-2zM0 5h2v1h-2zM5 5h2v1h-2zM0 6h2v1h-2zM5 6h2v1h-2zM0 7h2v1h-2zM4 7h3v1h-3zM0 8h6v1h-6zM9 0h5v1h-5zM11 1h2v1h-2zM11 2h2v1h-2zM11 3h2v1h-2zM11 4h2v1h-2zM11 5h2v1h-2zM11 6h2v1h-2zM11 7h2v1h-2zM9 8h5v1h-5zM16 0h2v1h-2zM21 0h2v1h-2zM16 1h3v1h-3zM21 1h2v1h-2zM16 2h4v1h-4zM21 2h2v1h-2zM16 3h2v1h-2zM19 3h4v1h-4zM16 4h2v1h-2zM20 4h3v1h-3zM16 5h2v1h-2zM21 5h2v1h-2zM16 6h2v1h-2zM21 6h2v1h-2zM16 7h2v1h-2zM21 7h2v1h-2zM16 8h2v1h-2zM21 8h2v1h-2zM26 0h5v1h-5zM25 1h2v1h-2zM30 1h2v1h-2zM25 2h2v1h-2zM30 2h2v1h-2zM25 3h2v1h-2zM30 3h2v1h-2zM25 4h2v1h-2zM30 4h2v1h-2zM25 5h2v1h-2zM30 5h2v1h-2zM25 6h2v1h-2zM30 6h2v1h-2zM25 7h2v1h-2zM30 7h2v1h-2zM26 8h5v1h-5z" /></svg></h1>
         <p class="tagline">Run through day and night.</p>
       </div>
-      <div class="spacer"></div>
+      <div class="spacer">
+        <p class="sky-how keys"><kbd>Space</kbd> to jump &middot; <kbd>&darr;</kbd> to duck</p>
+        <p class="sky-how touch">Tap to jump &middot; swipe down to duck</p>
+      </div>
       <div class="bottom">
         <p class="how keys"><kbd>Space</kbd> or <kbd>&uarr;</kbd> to jump &middot; <kbd>&darr;</kbd> to duck &middot; <kbd>M</kbd> sound</p>
         <p class="how touch">Tap to jump &middot; swipe down to duck</p>
