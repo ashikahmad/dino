@@ -8,6 +8,8 @@ drifts through day, afternoon, evening, night and dawn as your score climbs
 - Sprites are 1-bit pixel art in `src/art.ts` (one text row per pixel row, easy to edit), tinted in the shader, so there are no dark fringes while the sky changes. The art is traced from the sprite sheet of Chromium's offline dino game, keeping only the ink pixels and leaving out the sheet's white halo. The sun and moon are drawn in `src/sprites.ts`.
 - Day cycle keyframes live in `src/cycle.ts`.
 
+**Start screen:** a pixel-art title, short instructions, Share and GitHub buttons and credits. After a crash, the info button (or the I key) shows the same card again.
+
 **Controls:** Space / Up to jump (hold for a higher jump), Down to duck or drop faster, tap to jump and swipe down to duck on touch screens.
 
 ```
@@ -20,6 +22,8 @@ Pushes to `main` deploy to GitHub Pages through `.github/workflows/deploy.yml`
 (Settings -> Pages -> Source: GitHub Actions).
 
 ## Credits
+
+Made by Ashik uddin Ahmad, with Claude.
 
 Sprite shapes, sizes, collision boxes and game constants follow Chromium's offline dino game
 (BSD-3-Clause, Copyright 2013 The Chromium Authors).

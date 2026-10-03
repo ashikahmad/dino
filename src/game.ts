@@ -114,6 +114,7 @@ export class Game {
   private nudgeTo = 0;
   private nudgeT = NUDGE_MS;
   private flashOnCrash = true;
+  private lastSky = '';
   private highScore = 0;
   private runningTime = 0;
   private crashedAt = 0;
@@ -155,6 +156,10 @@ export class Game {
     }
     this.clouds.push({ x: rand(100, 500), y: rand(30, 71) });
     this.cloudGap = rand(100, 400);
+  }
+
+  get status(): State {
+    return this.state;
   }
 
   /** Before the first run, start in the night for dark-mode users and in the day otherwise. */
@@ -399,7 +404,12 @@ export class Game {
     // Cycle is score-based: frozen on game over, restarts with the score.
     const pal = this.withHitFlash(palette(this.clock()));
     document.body.style.background = rgbCss(pal.sky);
-    document.body.style.color = rgbCss(pal.fg); // the mute button follows the sprite colour
+    document.body.style.color = rgbCss(pal.fg); // text and buttons follow the sprite colour
+    const sky = rgbCss(pal.sky);
+    if (sky !== this.lastSky) {
+      this.lastSky = sky;
+      document.documentElement.style.setProperty('--sky', sky); // the about card tints with the sky
+    }
     r.begin(pal.sky);
 
     // sky: stars, sun and moon, clipped so they rise from behind the ground line
