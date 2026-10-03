@@ -1,8 +1,9 @@
 // Sounds are synthesised with the Web Audio API, so there are no audio files to ship.
-// They are short square-wave blips in the spirit of the original game's three sounds:
-// a jump, a hit, and a chime every 100 points.
+// The jump is a soft whoosh; the hit and the chime are short square-wave blips in the spirit
+// of the original game's sounds.
 
 const MUTE_KEY = 'dino-muted';
+const JUMP_LEVEL = 0.3; // matches the audition page at its default 60% volume
 
 /** Schedule a pitch sweep with a quick decay on `ctx`, starting at time `t`. */
 function blip(
@@ -44,10 +45,31 @@ function thud(ctx: BaseAudioContext, t: number, dur: number, peak: number): void
   src.start(t);
 }
 
+/** A short puff of band-passed noise whose pitch sweeps, for a soft whoosh. */
+function air(ctx: BaseAudioContext, t: number, from: number, to: number, dur: number, peak: number, k = 1): void {
+  const length = Math.max(1, Math.floor(ctx.sampleRate * dur));
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource();
+  const filter = ctx.createBiquadFilter();
+  const gain = ctx.createGain();
+  src.buffer = buffer;
+  filter.type = 'bandpass';
+  filter.Q.value = 2.5;
+  filter.frequency.setValueAtTime(from * k, t);
+  filter.frequency.exponentialRampToValueAtTime(to * k, t + dur);
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(peak, t + dur * 0.25);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(filter).connect(gain).connect(ctx.destination);
+  src.start(t);
+}
+
 export const effects = {
-  /** A short rising chirp. */
+  /** A soft whoosh, with a slight random pitch change so repeated jumps do not sound identical. */
   jump(ctx: BaseAudioContext, t = 0): void {
-    blip(ctx, t, 'square', 380, 760, 0.09, 0.07);
+    air(ctx, t, 400, 1500, 0.13, JUMP_LEVEL, 1 + (Math.random() - 0.5) * 0.08);
   },
   /** A falling buzz with a thud underneath. */
   hit(ctx: BaseAudioContext, t = 0): void {
