@@ -1,6 +1,6 @@
 import { MOON, NIGHT_START, mix, palette, safeAfter, type Palette } from './cycle';
 import { Renderer, VIEW_W, type RGB } from './renderer';
-import { GROUND_W, type Sprite, type SpriteName } from './sprites';
+import type { Sprite, SpriteName } from './sprites';
 
 // Constants follow the original Chrome game (units: px per 60Hz frame).
 const GRAVITY = 0.6;
@@ -18,9 +18,12 @@ const CLEAR_TIME = 3000;
 const GAP_RESPAWN = 750;
 const FRAME_MS = 1000 / 60;
 const DINO_X = 50;
-const GROUND_Y = 139; // the line the dino stands on (feet end here)
+const DINO_W = 44;
 const DINO_H = 47;
-const DUCK_H = 30;
+const DINO_GROUND_Y = 93; // 150 - 47 - 10, as in the original
+const HORIZON_Y = 127; // top of the ground sprite
+const GROUND_LINE_Y = 133; // the line itself: the sun and moon are cut off here
+const GROUND_W = 1200;
 const FLASH_MS = 100; // one negative flash when the dino is hit
 const NUDGE_MS = 500; // game-over transition that steps the sky out of a low-contrast moment
 const MAX_CLOUDS = 6;
@@ -29,36 +32,52 @@ const SKY_BODY_FADE = 0.4; // sun/moon are backdrop: blend them toward the sky c
 type Box = [number, number, number, number]; // x, y, w, h relative to the sprite
 
 interface ObstacleType {
-  sprites: SpriteName[];
-  w: number;
+  sprites: SpriteName[]; // cacti: one sprite per group size; pterodactyl: the wing frames
+  grouped: boolean;
+  w: number; // width of one unit
   h: number;
   y: number[]; // possible top positions
   minGap: number;
   minSpeed: number;
   multipleSpeed: number;
-  boxes: Box[][]; // per sprite frame
+  boxes: Box[]; // collision boxes for a single unit
 }
 
+// Sizes, positions and collision boxes are the original game's.
 const TYPES: Record<string, ObstacleType> = {
   cactusSmall: {
-    sprites: ['cactusSmall'], w: 17, h: 35, y: [105], minGap: 120, minSpeed: 0, multipleSpeed: 4,
-    boxes: [[[5, 0, 7, 35], [0, 10, 5, 10], [12, 6, 5, 10]]],
+    sprites: ['cactusSmall1', 'cactusSmall2', 'cactusSmall3'], grouped: true,
+    w: 17, h: 35, y: [105], minGap: 120, minSpeed: 0, multipleSpeed: 4,
+    boxes: [[0, 7, 5, 27], [4, 0, 6, 34], [10, 4, 7, 14]],
   },
   cactusLarge: {
-    sprites: ['cactusLarge'], w: 25, h: 50, y: [90], minGap: 120, minSpeed: 0, multipleSpeed: 7,
-    boxes: [[[8, 0, 9, 50], [0, 13, 9, 15], [16, 9, 9, 15]]],
+    sprites: ['cactusLarge1', 'cactusLarge2', 'cactusLarge3'], grouped: true,
+    w: 25, h: 50, y: [90], minGap: 120, minSpeed: 0, multipleSpeed: 7,
+    boxes: [[0, 12, 7, 38], [8, 0, 7, 49], [13, 10, 10, 38]],
   },
   ptero: {
-    sprites: ['pteroUp', 'pteroDown'], w: 46, h: 40, y: [100, 75, 50], minGap: 150, minSpeed: 8.5, multipleSpeed: 999,
-    boxes: [
-      [[0, 16, 18, 6], [16, 18, 28, 10], [20, 2, 14, 16]],
-      [[0, 16, 18, 6], [16, 18, 28, 10], [20, 28, 14, 10]],
-    ],
+    sprites: ['ptero1', 'ptero2'], grouped: false,
+    w: 46, h: 40, y: [100, 75, 50], minGap: 150, minSpeed: 8.5, multipleSpeed: 999,
+    boxes: [[15, 15, 16, 5], [18, 21, 24, 6], [2, 14, 4, 3], [6, 10, 4, 7], [10, 8, 6, 9]],
   },
 };
 
-const DINO_BOXES: Box[] = [[22, 0, 20, 16], [8, 16, 24, 22], [12, 38, 16, 9]];
-const DUCK_BOXES: Box[] = [[37, 0, 21, 14], [2, 8, 34, 20]];
+const DINO_BOXES: Box[] = [[22, 0, 17, 16], [1, 18, 30, 9], [10, 35, 14, 8], [1, 24, 29, 5], [5, 30, 21, 4], [9, 34, 15, 4]];
+const DUCK_BOXES: Box[] = [[1, 18, 55, 25]];
+
+/** A group of cacti shares one set of boxes: the middle one stretches, the right one moves out. */
+function obstacleBoxes(type: ObstacleType, size: number): Box[] {
+  const boxes = type.boxes.map((b) => [...b] as Box);
+  if (size > 1 && type.grouped) {
+    const width = size * type.w;
+    boxes[1][2] = width - boxes[0][2] - boxes[2][2];
+    boxes[2][0] = width - boxes[2][2];
+  }
+  return boxes;
+}
+
+const overlap = (ax: number, ay: number, aw: number, ah: number, bx: number, by: number, bw: number, bh: number) =>
+  ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
 
 interface Obstacle {
   type: ObstacleType;
@@ -73,7 +92,7 @@ interface Obstacle {
 }
 
 interface Cloud { x: number; y: number }
-interface Star { x: number; y: number; big: boolean }
+interface Star { x: number; y: number; alt: boolean }
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const randInt = (a: number, b: number) => Math.floor(rand(a, b + 1));
@@ -97,7 +116,7 @@ export class Game {
   private now = 0;
 
   // dino
-  private dinoY = GROUND_Y - DINO_H;
+  private dinoY = DINO_GROUND_Y;
   private jumping = false;
   private jumpVelocity = 0;
   private reachedMinHeight = false;
@@ -128,7 +147,7 @@ export class Game {
       /* storage unavailable */
     }
     for (let i = 0; i < 14; i++) {
-      this.stars.push({ x: rand(0, VIEW_W), y: rand(8, 80), big: Math.random() < 0.35 });
+      this.stars.push({ x: rand(0, VIEW_W), y: rand(0, 70), alt: Math.random() < 0.5 });
     }
     this.clouds.push({ x: rand(100, 500), y: rand(30, 71) });
     this.cloudGap = rand(100, 400);
@@ -197,7 +216,7 @@ export class Game {
     this.runningTime = 0;
     this.obstacles = [];
     this.lastTypes = [];
-    this.dinoY = GROUND_Y - DINO_H;
+    this.dinoY = DINO_GROUND_Y;
     this.jumping = false;
     this.speedDrop = false;
     this.ducking = this.downHeld;
@@ -275,7 +294,7 @@ export class Game {
     }
     if (!this.jumping) return;
 
-    const groundY = GROUND_Y - DINO_H;
+    const groundY = DINO_GROUND_Y;
     this.dinoY += this.jumpVelocity * (this.speedDrop ? SPEED_DROP_COEFFICIENT : 1) * df;
     this.jumpVelocity += GRAVITY * df;
 
@@ -292,7 +311,7 @@ export class Game {
   private updateObstacles(df: number, dtMs: number): void {
     for (const o of this.obstacles) {
       o.x -= (this.speed + o.speedOffset) * df;
-      if (o.type.sprites.length > 1) {
+      if (!o.type.grouped) {
         o.frameTimer += dtMs;
         if (o.frameTimer >= 1000 / 6) {
           o.frameTimer = 0;
@@ -328,7 +347,7 @@ export class Game {
       x: VIEW_W,
       y: type.y[randInt(0, type.y.length - 1)],
       gap: randInt(minGap, Math.round(minGap * 1.5)),
-      speedOffset: type.sprites.length > 1 ? (Math.random() < 0.5 ? -0.8 : 0.8) : 0,
+      speedOffset: !type.grouped ? (Math.random() < 0.5 ? -0.8 : 0.8) : 0,
       frame: 0,
       frameTimer: 0,
       followed: false,
@@ -348,25 +367,15 @@ export class Game {
   }
 
   private collides(): boolean {
-    const duck = this.ducking && !this.jumping;
-    const dx = DINO_X;
-    const dy = duck ? GROUND_Y - DUCK_H : this.dinoY;
-    const dBoxes = duck ? DUCK_BOXES : DINO_BOXES;
+    const dBoxes = this.ducking && !this.jumping ? DUCK_BOXES : DINO_BOXES;
+    const dx = DINO_X, dy = this.dinoY;
     for (const o of this.obstacles) {
-      const frameBoxes = o.type.boxes[o.frame % o.type.boxes.length];
-      for (let i = 0; i < o.size; i++) {
-        const ox = o.x + i * o.type.w;
-        for (const ob of frameBoxes) {
-          for (const db of dBoxes) {
-            if (
-              dx + db[0] < ox + ob[0] + ob[2] &&
-              dx + db[0] + db[2] > ox + ob[0] &&
-              dy + db[1] < o.y + ob[1] + ob[3] &&
-              dy + db[1] + db[3] > o.y + ob[1]
-            ) {
-              return true;
-            }
-          }
+      const width = o.size * o.type.w;
+      // cheap outer test first, then the detailed boxes
+      if (!overlap(dx + 1, dy + 1, DINO_W - 2, DINO_H - 2, o.x + 1, o.y + 1, width - 2, o.type.h - 2)) continue;
+      for (const ob of obstacleBoxes(o.type, o.size)) {
+        for (const db of dBoxes) {
+          if (overlap(dx + db[0], dy + db[1], db[2], db[3], o.x + ob[0], o.y + ob[1], ob[2], ob[3])) return true;
         }
       }
     }
@@ -387,31 +396,31 @@ export class Game {
     if (pal.night > 0.01) {
       for (const s of this.stars) {
         const x = (((s.x - this.starDrift) % VIEW_W) + VIEW_W) % VIEW_W;
-        r.draw(s.big ? S.starBig : S.starSmall, x, s.y, pal.fg, pal.night);
+        r.draw(s.alt ? S.star2 : S.star1, x, s.y, pal.fg, pal.night);
       }
     }
     if (pal.sun) r.draw(S.sun, pal.sun.x, pal.sun.y, mix(pal.sky, pal.sun.color, SKY_BODY_FADE));
     if (pal.moon) r.draw(S.moon, pal.moon.x, pal.moon.y, mix(pal.sky, MOON, SKY_BODY_FADE));
-    r.flush(GROUND_Y);
+    r.flush(GROUND_LINE_Y);
 
     for (const c of this.clouds) r.draw(S.cloud, c.x, c.y, pal.cloud);
 
     // ground: two tiles so it wraps seamlessly
     const gx = -this.groundX;
-    r.draw(S.ground, gx, GROUND_Y, pal.fg);
-    r.draw(S.ground, gx + GROUND_W, GROUND_Y, pal.fg);
+    r.draw(S.ground, gx, HORIZON_Y, pal.fg);
+    r.draw(S.ground, gx + GROUND_W, HORIZON_Y, pal.fg);
 
     for (const o of this.obstacles) {
-      const spr = S[o.type.sprites[o.frame % o.type.sprites.length]];
-      for (let i = 0; i < o.size; i++) r.draw(spr, o.x + i * o.type.w, o.y, pal.fg);
+      const spr = S[o.type.grouped ? o.type.sprites[o.size - 1] : o.type.sprites[o.frame % o.type.sprites.length]];
+      r.draw(spr, o.x, o.y, pal.fg);
     }
 
     this.renderDino(pal.fg);
     this.renderScore(pal.fg, pal.dim);
 
     if (this.state === 'crashed') {
-      this.text('GAME OVER', Math.round((VIEW_W - 9 * 12 + 2) / 2), 40, pal.fg);
-      r.draw(S.restart, (VIEW_W - 36) / 2, 70, pal.fg);
+      r.draw(S.gameOver, Math.round((VIEW_W - 191) / 2), 42, pal.fg);
+      r.draw(S.restart, (VIEW_W - 36) / 2, 75, pal.fg);
     }
     r.flush();
   }
@@ -430,36 +439,34 @@ export class Game {
 
   private renderDino(c: RGB): void {
     const S = this.r.sprites;
-    if (this.state === 'crashed') {
-      this.r.draw(S.dinoDead, DINO_X, this.dinoY, c);
-    } else if (this.jumping || this.state === 'idle') {
-      this.r.draw(S.dinoStand, DINO_X, this.dinoY, c);
-    } else if (this.ducking) {
-      this.r.draw(this.animFrame ? S.duckRight : S.duckLeft, DINO_X, GROUND_Y - DUCK_H, c);
-    } else {
-      this.r.draw(this.animFrame ? S.dinoRight : S.dinoLeft, DINO_X, this.dinoY, c);
-    }
+    let spr: Sprite;
+    if (this.state === 'crashed') spr = S.dinoDead;
+    else if (this.jumping || this.state === 'idle') spr = S.dinoStand;
+    else if (this.ducking) spr = this.animFrame ? S.duck2 : S.duck1;
+    else spr = this.animFrame ? S.dinoRun2 : S.dinoRun1;
+    this.r.draw(spr, DINO_X, this.dinoY, c);
   }
 
   private text(str: string, x: number, y: number, c: RGB): void {
     for (const ch of str) {
       const g: Sprite | undefined = this.r.sprites.glyphs[ch];
       if (g) this.r.draw(g, x, y, c);
-      x += 12;
+      x += 11;
     }
   }
 
   private renderScore(fg: RGB, dim: RGB): void {
     const pad = (n: number) => String(Math.min(n, 99999)).padStart(5, '0');
-    const x0 = 532;
+    const x0 = VIEW_W - 11 * 6; // the original's score position
     const showScore = !this.flashing || this.flashTimer >= 250;
     if (showScore) {
       const shown = this.flashing ? this.milestone * 100 : this.score;
-      this.text(pad(shown), x0, 8, fg);
+      this.text(pad(shown), x0, 5, fg);
     }
     if (this.highScore > 0) {
-      this.text('HI', x0 - 72 - 36, 8, dim);
-      this.text(pad(this.highScore), x0 - 72, 8, dim);
+      const hx = x0 - 100;
+      this.text('HI', hx, 5, dim);
+      this.text(pad(this.highScore), hx + 33, 5, dim);
     }
   }
 }

@@ -99,7 +99,7 @@ function lookup(stops: [number, RGB][], a: number): RGB {
 
 // ------------------------------------------------------------ sun & moon art
 
-const HORIZON = 139;
+const HORIZON = 133; // the ground line
 export const BODY_SIZE = 24; // sun and moon share the same diameter
 const X_FAR = 568; // they rise at the far (right) end ...
 const X_NEAR = 72; // ... and set behind the dino
