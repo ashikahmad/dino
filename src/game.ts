@@ -29,6 +29,7 @@ const FLASH_MS = 100; // one negative flash when the dino is hit
 const NUDGE_MS = 500; // game-over transition that steps the sky out of a low-contrast moment
 const MAX_CLOUDS = 6;
 const SKY_BODY_FADE = 0.4; // the sun is backdrop: blend it toward the sky colour
+const GROUND_FADE = 0.6; // the ground is drawn a little lighter than the sprites so the dino stands out from it
 const MOON_FADE = 0.55; // the moon is blended less, so it reads a little brighter against the night
 
 type Box = [number, number, number, number]; // x, y, w, h relative to the sprite
@@ -418,8 +419,9 @@ export class Game {
 
     // ground: two tiles so it wraps seamlessly
     const gx = -this.groundX;
-    r.draw(S.ground, gx, HORIZON_Y, pal.fg);
-    r.draw(S.ground, gx + GROUND_W, HORIZON_Y, pal.fg);
+    const groundTone = mix(pal.sky, pal.fg, GROUND_FADE);
+    r.draw(S.ground, gx, HORIZON_Y, groundTone);
+    r.draw(S.ground, gx + GROUND_W, HORIZON_Y, groundTone);
 
     for (const o of this.obstacles) {
       const spr = S[o.type.grouped ? o.type.sprites[o.size - 1] : o.type.sprites[o.frame % o.type.sprites.length]];
