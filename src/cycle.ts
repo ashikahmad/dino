@@ -143,7 +143,7 @@ const FG_DAY = hex('#535353');
 const FG_DUSK = hex('#2a2328');
 const FG_NIGHT = hex('#e4e4e4');
 const DUSK_SWITCH = 0.0; // sun altitude at the middle of the dark -> light ease
-const DAWN_SWITCH = -0.1; // ... and of the light -> dark ease
+const DAWN_SWITCH = -0.05; // ... and of the light -> dark ease
 const SWITCH_SPAN = 0.05; // half-width of the ease, in altitude
 
 // The moon appears once the sky is properly dark and is gone before dawn, so it
