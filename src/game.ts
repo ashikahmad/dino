@@ -27,7 +27,8 @@ const GROUND_W = 1200;
 const FLASH_MS = 100; // one negative flash when the dino is hit
 const NUDGE_MS = 500; // game-over transition that steps the sky out of a low-contrast moment
 const MAX_CLOUDS = 6;
-const SKY_BODY_FADE = 0.4; // sun/moon are backdrop: blend them toward the sky colour
+const SKY_BODY_FADE = 0.4; // the sun is backdrop: blend it toward the sky colour
+const MOON_FADE = 0.55; // the moon is blended less, so it reads a little brighter against the night
 
 type Box = [number, number, number, number]; // x, y, w, h relative to the sprite
 
@@ -400,7 +401,7 @@ export class Game {
       }
     }
     if (pal.sun) r.draw(S.sun, pal.sun.x, pal.sun.y, mix(pal.sky, pal.sun.color, SKY_BODY_FADE));
-    if (pal.moon) r.draw(S.moon, pal.moon.x, pal.moon.y, mix(pal.sky, MOON, SKY_BODY_FADE));
+    if (pal.moon) r.draw(S.moon, pal.moon.x, pal.moon.y, mix(pal.sky, MOON, MOON_FADE));
     r.flush(GROUND_LINE_Y);
 
     for (const c of this.clouds) r.draw(S.cloud, c.x, c.y, pal.cloud);
