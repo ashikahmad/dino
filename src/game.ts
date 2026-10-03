@@ -209,8 +209,13 @@ export class Game {
     this.sound.unlock();
     this.downHeld = true;
     if (this.state !== 'running') return;
-    if (this.jumping) this.speedDrop = true;
-    else this.ducking = true;
+    if (this.jumping) {
+      // Speed drop cancels the jump at once, as in the original: stop rising and fall fast.
+      this.speedDrop = true;
+      this.jumpVelocity = 1;
+    } else {
+      this.ducking = true;
+    }
   }
 
   releaseDown(): void {
