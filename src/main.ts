@@ -38,6 +38,46 @@ muteButton.addEventListener('pointerdown', (e) => e.stopPropagation());
 muteButton.addEventListener('pointerup', (e) => e.stopPropagation());
 
 
+
+// ----------------------------------------------------------------------- fullscreen
+type FsDoc = Document & { webkitFullscreenEnabled?: boolean; webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => Promise<void> | void };
+type FsEl = HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
+const fsDoc = document as FsDoc;
+const fsRoot = document.documentElement as FsEl;
+const fsButton = document.getElementById('fs') as HTMLButtonElement;
+const canFullscreen = Boolean(fsDoc.fullscreenEnabled || fsDoc.webkitFullscreenEnabled);
+const isFullscreen = () => Boolean(fsDoc.fullscreenElement || fsDoc.webkitFullscreenElement);
+
+function syncFullscreen(): void {
+  const on = isFullscreen();
+  fsButton.setAttribute('aria-pressed', String(on));
+  fsButton.setAttribute('aria-label', on ? 'Exit fullscreen' : 'Enter fullscreen');
+  fsButton.title = on ? 'Exit fullscreen (F)' : 'Fullscreen (F)';
+  resize(); // some browsers report the new size late
+}
+function toggleFullscreen(): void {
+  if (!canFullscreen) return;
+  try {
+    const result = isFullscreen()
+      ? (fsDoc.exitFullscreen ?? fsDoc.webkitExitFullscreen)?.call(document)
+      : (fsRoot.requestFullscreen ?? fsRoot.webkitRequestFullscreen)?.call(fsRoot);
+    void Promise.resolve(result).catch(() => {});
+  } catch {
+    /* refused: leave things as they are */
+  }
+}
+fsButton.hidden = !canFullscreen;
+fsButton.addEventListener('click', () => {
+  toggleFullscreen();
+  fsButton.blur();
+});
+document.addEventListener('fullscreenchange', syncFullscreen);
+document.addEventListener('webkitfullscreenchange', syncFullscreen);
+// iPhone Safari cannot fullscreen a web page; the home-screen app can
+const isIPhone = /iPhone|iPod/.test(navigator.userAgent);
+const standalone = window.matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches || (navigator as Navigator & { standalone?: boolean }).standalone;
+(document.getElementById('ios-hint') as HTMLElement).hidden = !(isIPhone && !canFullscreen && !standalone);
+
 // ---------------------------------------------------------------- start screen and about card
 const panel = document.getElementById('panel') as HTMLDivElement;
 const infoButton = document.getElementById('info') as HTMLButtonElement;
@@ -75,7 +115,7 @@ panel.addEventListener('click', (e) => {
   if (aboutOpen && !(e.target as Element).closest('a, button')) closeAbout();
 });
 // taps on the panel's links and buttons, or anywhere on the open card, must not count as a jump
-for (const el of [infoButton, ...panel.querySelectorAll<HTMLElement>('a, button')]) {
+for (const el of [infoButton, fsButton, ...panel.querySelectorAll<HTMLElement>('a, button')]) {
   el.addEventListener('pointerdown', (e) => e.stopPropagation());
   el.addEventListener('pointerup', (e) => e.stopPropagation());
 }
@@ -119,6 +159,10 @@ window.addEventListener('keydown', (e) => {
       e.preventDefault();
       closeAbout();
     }
+    return;
+  }
+  if (e.code === 'KeyF' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    toggleFullscreen();
     return;
   }
   if (e.code === 'KeyI' && game.status === 'crashed' && !e.repeat) {

@@ -4,8 +4,8 @@
   "description": "A WebGL take on the Chrome offline dino game, with a day and night cycle.",
   "start_url": "./",
   "scope": "./",
-  "display": "standalone",
-  "orientation": "landscape",
+  "display": "fullscreen",
+  "orientation": "any",
   "background_color": "#f7f7f7",
   "theme_color": "#f7f7f7",
   "icons": [

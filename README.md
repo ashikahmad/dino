@@ -10,7 +10,7 @@ drifts through day, afternoon, evening, night and dawn as your score climbs
 
 **Start screen:** a pixel-art title, short instructions, Share and GitHub buttons and credits. After a crash, the info button (or the I key) shows the same card again.
 
-**Controls:** Space / Up to jump (hold for a higher jump), Down to duck or drop faster, tap to jump and swipe down to duck on touch screens.
+**Controls:** Space / Up to jump (hold for a higher jump), Down to duck or drop faster, M for sound, F for fullscreen (where the browser allows it), tap to jump and swipe down to duck on touch screens.
 
 ```
 npm install
