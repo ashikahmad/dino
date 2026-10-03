@@ -59,7 +59,7 @@ const SETTING: Stop[] = [
   [-0.3, '#202124'], // night
   [-0.18, '#3a3858'],
   [-0.08, '#6b4f72'], // dusk purple
-  [0.0, '#b8667a'], // sun just gone: rose
+  [0.0, '#c8503f'], // sun just gone: ember
   [0.06, '#e0866a'], // sun half behind the ground
   [0.15, '#e8a27c'], // sun low, orange
   [0.25, '#f0cfa6'],
