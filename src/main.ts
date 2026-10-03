@@ -31,16 +31,15 @@ window.addEventListener('keyup', (e) => {
   else if (e.code === 'ArrowDown') game.releaseDown();
 });
 
-// Touch / mouse: tap to jump, swipe down to duck.
+// Touch / mouse: tap or click anywhere on the page to jump, swipe down to duck.
 let startY = 0;
 let swiped = false;
-canvas.addEventListener('pointerdown', (e) => {
+window.addEventListener('pointerdown', (e) => {
   startY = e.clientY;
   swiped = false;
-  canvas.setPointerCapture(e.pointerId);
   game.pressJump();
 });
-canvas.addEventListener('pointermove', (e) => {
+window.addEventListener('pointermove', (e) => {
   if (!swiped && e.buttons && e.clientY - startY > 24) {
     swiped = true;
     game.pressDown();
@@ -51,8 +50,8 @@ const pointerEnd = () => {
   if (swiped) game.releaseDown();
   swiped = false;
 };
-canvas.addEventListener('pointerup', pointerEnd);
-canvas.addEventListener('pointercancel', pointerEnd);
+window.addEventListener('pointerup', pointerEnd);
+window.addEventListener('pointercancel', pointerEnd);
 
 let last = performance.now();
 const frame = (t: number) => {
