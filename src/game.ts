@@ -1,5 +1,6 @@
 import { MOON, NIGHT_START, mix, palette, safeAfter, type Palette } from './cycle';
 import { Renderer, VIEW_W, type RGB } from './renderer';
+import { Sound } from './sound';
 import type { Sprite, SpriteName } from './sprites';
 
 // Constants follow the original Chrome game (units: px per 60Hz frame).
@@ -101,6 +102,7 @@ const randInt = (a: number, b: number) => Math.floor(rand(a, b + 1));
 type State = 'idle' | 'running' | 'crashed';
 
 export class Game {
+  readonly sound = new Sound();
   private state: State = 'idle';
   private speed = START_SPEED;
   private distance = 0;
@@ -176,6 +178,7 @@ export class Game {
   // ------------------------------------------------------------------ input
 
   pressJump(): void {
+    this.sound.unlock();
     if (this.state === 'crashed') {
       if (this.now - this.crashedAt >= GAP_RESPAWN) this.restart();
       return;
@@ -183,6 +186,7 @@ export class Game {
     if (this.state === 'idle') this.state = 'running';
     if (!this.jumping && !this.ducking) {
       this.jumping = true;
+      this.sound.jump();
       this.jumpVelocity = INITIAL_JUMP_VELOCITY - this.speed / 10;
       this.reachedMinHeight = false;
       this.speedDrop = false;
@@ -196,6 +200,7 @@ export class Game {
   }
 
   pressDown(): void {
+    this.sound.unlock();
     this.downHeld = true;
     if (this.state !== 'running') return;
     if (this.jumping) this.speedDrop = true;
@@ -248,6 +253,7 @@ export class Game {
 
     if (this.obstacles.length && this.collides()) {
       this.state = 'crashed';
+      this.sound.hit();
       this.crashedAt = this.now;
       this.flashOnCrash = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       this.crashClock = this.clockBase + this.score;
@@ -273,6 +279,7 @@ export class Game {
 
     const m = Math.floor(this.score / 100);
     if (m > this.milestone && m > 0) {
+      this.sound.score();
       this.flashing = true;
       this.flashTimer = 0;
       this.flashIter = 0;
@@ -391,6 +398,7 @@ export class Game {
     // Cycle is score-based: frozen on game over, restarts with the score.
     const pal = this.withHitFlash(palette(this.clock()));
     document.body.style.background = rgbCss(pal.sky);
+    document.body.style.color = rgbCss(pal.fg); // the mute button follows the sprite colour
     r.begin(pal.sky);
 
     // sky: stars, sun and moon, clipped so they rise from behind the ground line

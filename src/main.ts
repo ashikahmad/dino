@@ -15,6 +15,25 @@ const resize = () => renderer.resize();
 window.addEventListener('resize', resize);
 resize();
 
+// Sound on/off: a button for touch screens and the M key.
+const muteButton = document.getElementById('mute') as HTMLButtonElement;
+const showMuted = () => {
+  muteButton.setAttribute('aria-pressed', String(game.sound.isMuted));
+  muteButton.setAttribute('aria-label', game.sound.isMuted ? 'Sound off' : 'Sound on');
+};
+const toggleMute = () => {
+  game.sound.setMuted(!game.sound.isMuted);
+  showMuted();
+};
+showMuted();
+muteButton.addEventListener('click', () => {
+  toggleMute();
+  muteButton.blur(); // keep the keyboard on the game
+});
+// taps on the button must not count as a jump
+muteButton.addEventListener('pointerdown', (e) => e.stopPropagation());
+muteButton.addEventListener('pointerup', (e) => e.stopPropagation());
+
 const isJump = (e: KeyboardEvent) => e.code === 'Space' || e.code === 'ArrowUp';
 
 window.addEventListener('keydown', (e) => {
@@ -24,6 +43,8 @@ window.addEventListener('keydown', (e) => {
   } else if (e.code === 'ArrowDown') {
     e.preventDefault();
     game.pressDown();
+  } else if (e.code === 'KeyM' && !e.repeat) {
+    toggleMute();
   }
 });
 window.addEventListener('keyup', (e) => {
@@ -46,6 +67,7 @@ window.addEventListener('pointermove', (e) => {
   }
 });
 const pointerEnd = () => {
+  game.sound.unlock(); // touch screens only count a finished tap as permission to play audio
   game.releaseJump();
   if (swiped) game.releaseDown();
   swiped = false;
