@@ -105,6 +105,7 @@ function syncPanel(): void {
     window.clearTimeout(overlayTimer);
     overlayTimer = 0;
     panel.classList.toggle('overlay', aboutOpen);
+    panel.classList.remove('instant');
   } else if (panel.classList.contains('overlay') && !overlayTimer) {
     // closed over the game-over screen: let the card fade out where it is, then drop its layout
     overlayTimer = window.setTimeout(() => {
@@ -123,6 +124,8 @@ function openAbout(): void {
 }
 function closeAbout(): void {
   aboutOpen = false;
+  // over the game-over screen the card just goes, revealing the scene as it was (no fading contents)
+  if (game.status !== 'idle') panel.classList.add('instant');
   (document.activeElement as HTMLElement | null)?.blur();
   syncPanel();
 }
@@ -206,27 +209,35 @@ window.addEventListener('keyup', (e) => {
 });
 
 // Touch / mouse: tap or click anywhere on the page to jump, swipe down to duck.
-let startY = 0;
-let swiped = false;
+// Each finger is tracked on its own, and only if it started on the game: a press that began on a
+// button, or a stray move, must never count as a swipe (a swipe that is never released leaves the dino ducking).
+const gestures = new Map<number, { startY: number; swiped: boolean }>();
 window.addEventListener('pointerdown', (e) => {
-  startY = e.clientY;
-  swiped = false;
+  gestures.set(e.pointerId, { startY: e.clientY, swiped: false });
   game.pressJump();
 });
 window.addEventListener('pointermove', (e) => {
-  if (!swiped && e.buttons && e.clientY - startY > 24) {
-    swiped = true;
+  const g = gestures.get(e.pointerId);
+  if (g && !g.swiped && e.clientY - g.startY > 24) {
+    g.swiped = true;
     game.pressDown();
   }
 });
-const pointerEnd = () => {
+const pointerEnd = (e: PointerEvent) => {
   game.sound.unlock(); // touch screens only count a finished tap as permission to play audio
+  const g = gestures.get(e.pointerId);
+  if (!g) return;
+  gestures.delete(e.pointerId);
   game.releaseJump();
-  if (swiped) game.releaseDown();
-  swiped = false;
+  if (g.swiped) game.releaseDown();
 };
 window.addEventListener('pointerup', pointerEnd);
 window.addEventListener('pointercancel', pointerEnd);
+// if the page loses focus mid-gesture, let go of everything
+window.addEventListener('blur', () => {
+  if ([...gestures.values()].some((g) => g.swiped)) game.releaseDown();
+  gestures.clear();
+});
 
 let last = performance.now();
 const frame = (t: number) => {

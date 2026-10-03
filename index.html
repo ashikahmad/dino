@@ -36,6 +36,7 @@
       @media (prefers-color-scheme: dark) { body { color: #e4e4e4; } }
       #panel { position: fixed; inset: 0; z-index: 5; display: grid; grid-template-rows: minmax(0, 1fr) var(--canvas-h, 150px) minmax(0, 1fr); justify-items: center; padding-inline: 16px; text-align: center; pointer-events: none; transition: opacity 0.35s ease; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
       #panel.hidden { opacity: 0; visibility: hidden; transition: opacity 0.35s ease, visibility 0s linear 0.35s; }
+      #panel.hidden.instant { transition: none; }
       #panel .top { align-self: end; display: grid; justify-items: center; gap: 10px; padding-bottom: 20px; }
       #panel .bottom { align-self: start; display: grid; justify-items: center; gap: 14px; padding-top: 20px; max-width: 560px; }
       .title { margin: 0; line-height: 0; }
