@@ -44,6 +44,7 @@ export class Renderer {
   private color = new Float32Array(MAX_QUADS * 16);
   private count = 0;
   private scale = 1;
+  private invScale = 1;
   private invW: number;
   private invH: number;
   private buffers: NonNullable<twgl.BufferInfo['attribs']>;
@@ -101,6 +102,7 @@ export class Renderer {
     let s = Math.min(availW / VIEW_W, availH / VIEW_H);
     if (s >= 2) s = Math.floor(s);
     this.scale = s;
+    this.invScale = 1 / s;
     const w = Math.round(VIEW_W * s);
     const h = Math.round(VIEW_H * s);
     if (this.canvas.width !== w || this.canvas.height !== h) {
@@ -119,11 +121,12 @@ export class Renderer {
     this.count = 0;
   }
 
-  /** Queue a sprite at integer logical pixel coordinates. */
+  /** Queue a sprite at a logical pixel position (snapped to the nearest device pixel). */
   draw(s: Sprite, x: number, y: number, c: RGB, alpha = 1, flipX = false): void {
     if (this.count >= MAX_QUADS) return;
-    x = Math.round(x);
-    y = Math.round(y);
+    // snap to a device pixel: the sprites stay sharp and slow motion moves in the finest steps the screen has
+    x = Math.round(x * this.scale) * this.invScale;
+    y = Math.round(y * this.scale) * this.invScale;
     const x1 = x + s.w, y1 = y + s.h;
     let u0 = s.x * this.invW, u1 = (s.x + s.w) * this.invW;
     const v0 = s.y * this.invH, v1 = (s.y + s.h) * this.invH;

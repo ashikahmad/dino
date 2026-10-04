@@ -32,10 +32,18 @@ export interface GameView {
   readonly animFrame: number;
   readonly groundX: number;
   readonly starDrift: number;
+  readonly alpha: number; // how far between the last two steps this frame is
+  readonly prevGroundX: number;
+  readonly prevStarDrift: number;
+  readonly prevDinoY: number;
   readonly clouds: readonly Cloud[];
   readonly stars: readonly Star[];
   readonly obstacles: readonly Obstacle[];
 }
+
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+/** Blend between two positions of something that wraps around at `period`. */
+const wrapLerp = (a: number, b: number, t: number, period: number) => lerp(a, b < a ? b + period : b, t) % period;
 
 export class Scene {
   constructor(private r: Renderer) {}
@@ -49,10 +57,11 @@ export class Scene {
 
     // sky: stars, sun and moon, clipped so they rise from behind the ground line
     // the stars use the moon's tone so the two sit together
+    const drift = wrapLerp(g.prevStarDrift, g.starDrift, g.alpha, VIEW_W);
     const moonTone = mix(pal.sky, MOON, MOON_FADE);
     if (pal.night > 0.01) {
       for (const s of g.stars) {
-        const x = (((s.x - g.starDrift) % VIEW_W) + VIEW_W) % VIEW_W;
+        const x = (((s.x - drift) % VIEW_W) + VIEW_W) % VIEW_W;
         r.draw(s.alt ? S.star2 : S.star1, x, s.y, moonTone, pal.night);
       }
     }
@@ -60,17 +69,17 @@ export class Scene {
     if (pal.moon) r.draw(S.moon, pal.moon.x, pal.moon.y, moonTone);
     r.flush(GROUND_LINE_Y);
 
-    for (const c of g.clouds) r.draw(S.cloud, c.x, c.y, pal.cloud);
+    for (const c of g.clouds) r.draw(S.cloud, lerp(c.prevX, c.x, g.alpha), c.y, pal.cloud);
 
     // ground: two tiles so it wraps seamlessly
-    const gx = -g.groundX;
+    const gx = -wrapLerp(g.prevGroundX, g.groundX, g.alpha, GROUND_W);
     const groundTone = mix(pal.sky, pal.fg, GROUND_FADE);
     r.draw(S.ground, gx, HORIZON_Y, groundTone);
     r.draw(S.ground, gx + GROUND_W, HORIZON_Y, groundTone);
 
     for (const o of g.obstacles) {
       const spr = S[o.type.grouped ? o.type.sprites[o.size - 1] : o.type.sprites[o.frame % o.type.sprites.length]];
-      r.draw(spr, o.x, o.y, pal.fg);
+      r.draw(spr, lerp(o.prevX, o.x, g.alpha), o.y, pal.fg);
     }
 
     this.renderDino(g, pal.fg);
@@ -102,7 +111,7 @@ export class Scene {
     else if (g.jumping || g.status === 'idle') spr = S.dinoStand;
     else if (g.ducking) spr = g.animFrame ? S.duck2 : S.duck1;
     else spr = g.animFrame ? S.dinoRun2 : S.dinoRun1;
-    this.r.draw(spr, DINO_X, g.dinoY, c);
+    this.r.draw(spr, DINO_X, lerp(g.prevDinoY, g.dinoY, g.alpha), c);
   }
 
   private text(str: string, x: number, y: number, c: RGB): void {

@@ -68,6 +68,7 @@ export interface Obstacle {
   type: ObstacleType;
   size: number;
   x: number;
+  prevX: number; // before the latest step
   y: number;
   gap: number;
   speedOffset: number;

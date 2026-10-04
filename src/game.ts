@@ -79,7 +79,10 @@ export class Game implements GameView {
     for (let i = 0; i < 14; i++) {
       this.stars.push({ x: rand(0, VIEW_W), y: rand(0, 70), alt: Math.random() < 0.5 });
     }
-    this.clouds.push({ x: rand(100, 500), y: rand(30, 71) });
+    {
+      const x = rand(100, 500);
+      this.clouds.push({ x, prevX: x, y: rand(30, 71) });
+    }
     this.cloudGap = rand(100, 400);
   }
 
@@ -88,6 +91,11 @@ export class Game implements GameView {
   }
 
   private dirty = true;
+  private accumulator = 0;
+  alpha = 1; // how far between the last two steps the picture is
+  prevGroundX = 0;
+  prevStarDrift = 0;
+  prevDinoY = DINO_GROUND_Y;
 
   /** Ask for the next frame to be drawn (the canvas was resized, the colours changed, ...). */
   invalidate(): void {
@@ -187,6 +195,11 @@ export class Game implements GameView {
     this.ducking = this.downHeld;
     this.milestone = 0;
     this.scoreFlashing = false;
+    this.accumulator = 0;
+    this.alpha = 1;
+    this.prevDinoY = this.dinoY;
+    this.prevGroundX = this.groundX;
+    this.prevStarDrift = this.starDrift;
   }
 
   // ----------------------------------------------------------------- update
@@ -201,7 +214,30 @@ export class Game implements GameView {
       return;
     }
     if (this.state !== 'running') return; // the idle screen is frozen
-    const df = dtMs / FRAME_MS;
+
+    // The simulation advances in fixed 60 Hz steps, so every step moves things by exactly the
+    // same distance whatever the frame times are. Drawing blends between the last two steps (alpha).
+    this.accumulator += dtMs;
+    for (let n = 0; this.accumulator >= FRAME_MS && n < 6 && this.state === 'running'; n++) {
+      this.accumulator -= FRAME_MS;
+      this.rememberPositions();
+      this.step();
+    }
+    this.alpha = this.state === 'running' ? Math.min(1, this.accumulator / FRAME_MS) : 1;
+  }
+
+  /** Where things were before the latest step, for drawing between steps. */
+  private rememberPositions(): void {
+    this.prevGroundX = this.groundX;
+    this.prevStarDrift = this.starDrift;
+    this.prevDinoY = this.dinoY;
+    for (const o of this.obstacles) o.prevX = o.x;
+    for (const c of this.clouds) c.prevX = c.x;
+  }
+
+  private step(): void {
+    const df = 1;
+    const dtMs = FRAME_MS;
 
     this.updateClouds(df);
     this.starDrift = (this.starDrift + 0.3 * df) % VIEW_W;
@@ -316,6 +352,7 @@ export class Game implements GameView {
       type,
       size,
       x: VIEW_W,
+      prevX: VIEW_W,
       y: type.y[randInt(0, type.y.length - 1)],
       gap: randInt(minGap, Math.round(minGap * 1.5)),
       speedOffset: !type.grouped ? (Math.random() < 0.5 ? -0.8 : 0.8) : 0,
@@ -332,7 +369,7 @@ export class Game implements GameView {
     while (this.clouds.length && this.clouds[0].x <= -46) this.clouds.shift();
     const last = this.clouds[this.clouds.length - 1];
     if (this.clouds.length < MAX_CLOUDS && (!last || VIEW_W - last.x > this.cloudGap)) {
-      this.clouds.push({ x: VIEW_W, y: rand(30, 71) });
+      this.clouds.push({ x: VIEW_W, prevX: VIEW_W, y: rand(30, 71) });
       this.cloudGap = rand(100, 400);
     }
   }
