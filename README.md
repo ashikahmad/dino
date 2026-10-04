@@ -27,3 +27,17 @@ Made by Ashik uddin Ahmad, with Claude.
 
 Sprite shapes, sizes, collision boxes and game constants follow Chromium's offline dino game
 (BSD-3-Clause, Copyright 2013 The Chromium Authors).
+
+## Code layout
+
+| File | Role |
+| --- | --- |
+| `src/main.ts` | Wires everything together and runs the frame loop |
+| `src/game.ts` | The simulation: physics, obstacles, score, state (no drawing) |
+| `src/obstacles.ts`, `src/world.ts` | Obstacle types and collision boxes; shared layout constants |
+| `src/scene.ts` | Draws a frame from the game's state |
+| `src/theme.ts` | Tints the page around the canvas, only when the colour changes |
+| `src/cycle.ts` | The day/night model: sun, moon, sky and sprite colours |
+| `src/renderer.ts`, `src/sprites.ts`, `src/art.ts` | WebGL batching, atlas building, pixel art |
+| `src/input.ts`, `src/panel.ts`, `src/bar.ts` | Keyboard/touch input, start screen and About card, sound and fullscreen buttons |
+| `src/sound.ts` | Synthesised sound effects |

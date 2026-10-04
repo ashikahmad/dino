@@ -28,9 +28,7 @@ uniform sampler2D u_tex;
 varying vec2 v_uv;
 varying vec4 v_color;
 void main() {
-  float a = texture2D(u_tex, v_uv).a * v_color.a;
-  if (a < 0.01) discard;
-  gl_FragColor = vec4(v_color.rgb, a);
+  gl_FragColor = vec4(v_color.rgb, texture2D(u_tex, v_uv).a * v_color.a);
 }`;
 
 /** Batches textured quads from one sprite atlas and draws them in a single call. */
@@ -46,13 +44,18 @@ export class Renderer {
   private color = new Float32Array(MAX_QUADS * 16);
   private count = 0;
   private scale = 1;
+  private invW: number;
+  private invH: number;
+  private buffers: NonNullable<twgl.BufferInfo['attribs']>;
 
   constructor(readonly canvas: HTMLCanvasElement) {
-    const gl = canvas.getContext('webgl', { alpha: false, antialias: false });
+    const gl = canvas.getContext('webgl', { alpha: false, antialias: false, depth: false, stencil: false });
     if (!gl) throw new Error('WebGL is not available');
     this.gl = gl;
     this.atlas = buildAtlas();
     this.sprites = this.atlas.sprites;
+    this.invW = 1 / this.atlas.width;
+    this.invH = 1 / this.atlas.height;
 
     this.programInfo = twgl.createProgramInfo(gl, [vs, fs]);
 
@@ -78,8 +81,13 @@ export class Renderer {
       wrap: gl.CLAMP_TO_EDGE,
     });
 
+    // everything below stays bound for the life of the context: nothing else draws
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.useProgram(this.programInfo.program);
+    twgl.setBuffersAndAttributes(gl, this.programInfo, this.bufferInfo);
+    twgl.setUniforms(this.programInfo, { u_view: [VIEW_W, VIEW_H], u_tex: this.texture });
+    this.buffers = this.bufferInfo.attribs!;
   }
 
   /**
@@ -95,8 +103,10 @@ export class Renderer {
     this.scale = s;
     const w = Math.round(VIEW_W * s);
     const h = Math.round(VIEW_H * s);
-    this.canvas.width = w;
-    this.canvas.height = h;
+    if (this.canvas.width !== w || this.canvas.height !== h) {
+      this.canvas.width = w; // resizing reallocates the drawing buffer, so only when it changed
+      this.canvas.height = h;
+    }
     this.canvas.style.width = `${w / dpr}px`;
     this.canvas.style.height = `${h / dpr}px`;
     this.gl.viewport(0, 0, w, h);
@@ -114,19 +124,25 @@ export class Renderer {
     if (this.count >= MAX_QUADS) return;
     x = Math.round(x);
     y = Math.round(y);
-    const aw = this.atlas.width, ah = this.atlas.height;
-    let u0 = s.x / aw, u1 = (s.x + s.w) / aw;
-    const v0 = s.y / ah, v1 = (s.y + s.h) / ah;
-    if (flipX) [u0, u1] = [u1, u0];
+    const x1 = x + s.w, y1 = y + s.h;
+    let u0 = s.x * this.invW, u1 = (s.x + s.w) * this.invW;
+    const v0 = s.y * this.invH, v1 = (s.y + s.h) * this.invH;
+    if (flipX) {
+      const t = u0;
+      u0 = u1;
+      u1 = t;
+    }
+    const pos = this.pos, uv = this.uv, color = this.color;
     const i = this.count * 8;
-    this.pos.set([x, y, x + s.w, y, x, y + s.h, x + s.w, y + s.h], i);
-    this.uv.set([u0, v0, u1, v0, u0, v1, u1, v1], i);
-    const k = this.count * 16;
-    for (let n = 0; n < 4; n++) {
-      this.color[k + n * 4] = c[0];
-      this.color[k + n * 4 + 1] = c[1];
-      this.color[k + n * 4 + 2] = c[2];
-      this.color[k + n * 4 + 3] = alpha;
+    pos[i] = x; pos[i + 1] = y; pos[i + 2] = x1; pos[i + 3] = y;
+    pos[i + 4] = x; pos[i + 5] = y1; pos[i + 6] = x1; pos[i + 7] = y1;
+    uv[i] = u0; uv[i + 1] = v0; uv[i + 2] = u1; uv[i + 3] = v0;
+    uv[i + 4] = u0; uv[i + 5] = v1; uv[i + 6] = u1; uv[i + 7] = v1;
+    for (let k = this.count * 16, end = k + 16; k < end; k += 4) {
+      color[k] = c[0];
+      color[k + 1] = c[1];
+      color[k + 2] = c[2];
+      color[k + 3] = alpha;
     }
     this.count++;
   }
@@ -143,16 +159,19 @@ export class Renderer {
       gl.enable(gl.SCISSOR_TEST);
       gl.scissor(0, this.canvas.height - h, this.canvas.width, h);
     }
-    const a = this.bufferInfo.attribs!;
-    twgl.setAttribInfoBufferFromArray(gl, a.a_pos, this.pos);
-    twgl.setAttribInfoBufferFromArray(gl, a.a_uv, this.uv);
-    twgl.setAttribInfoBufferFromArray(gl, a.a_color, this.color);
-    gl.useProgram(this.programInfo.program);
-    twgl.setBuffersAndAttributes(gl, this.programInfo, this.bufferInfo);
-    twgl.setUniforms(this.programInfo, { u_view: [VIEW_W, VIEW_H], u_tex: this.texture });
-    twgl.drawBufferInfo(gl, this.bufferInfo, gl.TRIANGLES, this.count * 6);
+    // upload only the quads queued, not the whole buffers
+    const n = this.count;
+    this.upload(this.buffers.a_pos.buffer, this.pos.subarray(0, n * 8));
+    this.upload(this.buffers.a_uv.buffer, this.uv.subarray(0, n * 8));
+    this.upload(this.buffers.a_color.buffer, this.color.subarray(0, n * 16));
+    gl.drawElements(gl.TRIANGLES, n * 6, gl.UNSIGNED_SHORT, 0);
     gl.disable(gl.SCISSOR_TEST);
     this.count = 0;
+  }
+
+  private upload(buffer: WebGLBuffer, data: Float32Array): void {
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
+    this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, data);
   }
 
   get pixelScale(): number {
