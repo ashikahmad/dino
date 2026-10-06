@@ -54,7 +54,11 @@ export async function startDev() {
 
 /** Build the game, then run the host server (server/host.mjs) that serves it and relays a race. */
 export async function startHost() {
-  execFileSync(process.execPath, [join(ROOT, 'node_modules/vite/bin/vite.js'), 'build', '--logLevel', 'error'], { cwd: ROOT });
+  // vite.config.ts builds for the /dino/ sub-path of GitHub Pages when GITHUB_ACTIONS is set (as in CI);
+  // the test host serves the game from the root, so build without it
+  const env = { ...process.env };
+  delete env.GITHUB_ACTIONS;
+  execFileSync(process.execPath, [join(ROOT, 'node_modules/vite/bin/vite.js'), 'build', '--logLevel', 'error'], { cwd: ROOT, env });
   const port = await freePort();
   const p = run(process.execPath, ['server/host.mjs'], { PORT: String(port) });
   const url = `http://localhost:${port}`;
