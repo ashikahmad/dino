@@ -71,6 +71,8 @@ export class Game implements GameView {
   travel = 0;
   prevTravel = 0;
   deathTravel = 0;
+  /** The race is over: the course stops where it is, so the last crash can be looked at. */
+  courseStopped = false;
   worldScore = 0; // the course's score: equal to `score` until the player crashes, then it carries on
   private rng: () => number = Math.random; // drives the obstacles only; clouds and stars stay cosmetic
   /** Called once when the dino is hit, with the final score. */
@@ -123,7 +125,7 @@ export class Game implements GameView {
       this.dirty = false;
       return true;
     }
-    return this.state === 'running' || this.state === 'countdown' || (this.state === 'crashed' && this.race);
+    return this.state === 'running' || this.state === 'countdown' || (this.state === 'crashed' && this.race && !this.courseStopped);
   }
 
   /** Before the first run, start in the night for dark-mode users and in the day otherwise. */
@@ -222,12 +224,21 @@ export class Game implements GameView {
     this.dirty = true;
   }
 
+  /** Stop the course where it is (the last player has crashed). */
+  stopCourse(): void {
+    this.courseStopped = true;
+    this.accumulator = 0;
+    this.alpha = 1;
+    this.dirty = true;
+  }
+
   /** Whole seconds left before a race starts (0 when not counting down). */
   get countdown(): number {
     return this.state === 'countdown' ? Math.ceil(this.countdownMs / 1000) : 0;
   }
 
   private reset(): void {
+    this.courseStopped = false;
     this.speed = START_SPEED;
     this.distance = 0;
     this.score = 0;
@@ -274,7 +285,7 @@ export class Game implements GameView {
     // The simulation advances in fixed 60 Hz steps, so every step moves things by exactly the
     // same distance whatever the frame times are. Drawing blends between the last two steps (alpha).
     this.accumulator += dtMs;
-    const stepping = () => this.state === 'running' || (this.state === 'crashed' && this.race);
+    const stepping = () => this.state === 'running' || (this.state === 'crashed' && this.race && !this.courseStopped);
     for (let n = 0; this.accumulator >= FRAME_MS && n < 6 && stepping(); n++) {
       this.accumulator -= FRAME_MS;
       this.rememberPositions();

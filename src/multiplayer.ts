@@ -188,7 +188,8 @@ function handle(m: ServerMessage): void {
       break;
     }
     case 'results':
-      // a short pause, so the last crash can be seen before the scores replace it
+      // the course stops where it is, and a short pause lets the last crash be seen before the scores replace it
+      game.stopCourse();
       resultsTimer = window.setTimeout(() => showResults(m.ranking), RESULTS_DELAY_MS);
       break;
     case 'full':
@@ -310,6 +311,7 @@ function refreshHud(): void {
 export function tickMultiplayer(now: number): void {
   if (!racing || !game.race) return;
   for (const g of ghosts.values()) g.shownY += (g.y - g.shownY) * 0.35;
+  if (game.courseStopped) game.invalidate(); // keep drawing through the pause (the last crash's flash, ghosts settling)
   if (game.status === 'running' && now - lastSend >= SEND_EVERY_MS) {
     lastSend = now;
     net.send({ t: 'state', y: game.dinoY, s: game.score, j: game.jumping, d: game.ducking });
