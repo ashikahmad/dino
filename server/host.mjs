@@ -64,6 +64,7 @@ const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 2048 });
 let nextId = 1;
 let phase = 'lobby'; // lobby -> racing -> results -> lobby
 const players = new Map(); // id -> { id, ws, name, racing, alive, score }
+let leavers = []; // racers who left before the race ended: their result still counts, {id, name, score, left}
 
 const send = (ws, msg) => ws.readyState === 1 && ws.send(JSON.stringify(msg));
 const broadcast = (msg, exceptId) => {
@@ -83,7 +84,8 @@ function finishIfDone() {
   const racers = [...players.values()].filter((p) => p.racing);
   if (racers.some((p) => p.alive)) return;
   phase = 'results';
-  const ranking = racers.sort((a, b) => b.score - a.score).map((p) => ({ id: p.id, name: p.name, score: p.score }));
+  const ranking = [...racers.map((p) => ({ id: p.id, name: p.name, score: p.score })), ...leavers]
+    .sort((a, b) => b.score - a.score);
   broadcast({ t: 'results', ranking });
   announce();
 }
@@ -131,6 +133,7 @@ wss.on('connection', (ws) => {
         const all = [...players.values()];
         if (phase !== 'lobby' || all.length < 2 || !all.every((p) => p.ready)) break;
         phase = 'racing';
+        leavers = [];
         for (const p of all) Object.assign(p, { ready: false, racing: true, alive: true, score: 0 });
         broadcast({ t: 'go', seed: (Math.random() * 2 ** 32) >>> 0, startIn: COUNTDOWN_MS, racers: players.size });
         announce();
@@ -155,6 +158,7 @@ wss.on('connection', (ws) => {
       case 'lobby':
         if (phase === 'results') {
           phase = 'lobby';
+          leavers = [];
           for (const p of players.values()) Object.assign(p, { racing: false, ready: false });
           announce();
         }
@@ -164,8 +168,12 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     players.delete(id);
-    if (!players.size) phase = 'lobby';
-    else if (phase === 'racing') {
+    if (!players.size) {
+      phase = 'lobby';
+      leavers = [];
+    } else if (phase === 'racing') {
+      // someone who leaves mid-race keeps the result they had, and still appears in the ranking
+      if (me.racing) leavers.push({ id, name: me.name, score: me.score, left: true });
       me.alive = false;
       broadcast({ t: 'dead', id, s: me.score });
       finishIfDone();

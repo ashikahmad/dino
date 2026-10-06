@@ -20,6 +20,7 @@ const NAME_KEY = 'dino-name';
 const SEND_EVERY_MS = 66; // how often we tell the others where we are
 const HUD_EVERY_MS = 250;
 const RESULTS_DELAY_MS = 1500;
+const LEAVE_BUTTON_DELAY_MS = 500;
 
 type View = 'guide' | 'lobby' | 'results' | 'error';
 
@@ -224,7 +225,7 @@ function showResults(ranking: RankRow[]): void {
       const li = document.createElement('li');
       if (r.id === me) li.className = 'me';
       const left = document.createElement('span');
-      left.textContent = `${i + 1}. ${r.name}${r.id === me ? ' (you)' : ''}`;
+      left.textContent = `${i + 1}. ${r.name}${r.id === me ? ' (you)' : ''}${r.left ? ' (left)' : ''}`;
       const right = document.createElement('b');
       right.textContent = String(r.score).padStart(5, '0');
       li.append(left, right);
@@ -278,7 +279,6 @@ function refreshHud(): void {
   const rect = canvas.getBoundingClientRect();
   // above the canvas when there is room (several rows would cover the playfield), else over its corner
   // out of the race: the course carries on behind the Game Over screen, and you may leave
-  leaveRaceButton.hidden = !(racing && game.status === 'crashed');
   leaveRaceButton.style.top = `${rect.bottom + 14}px`;
   hud.style.left = `${rect.left + 6}px`;
   hud.style.width = `${rect.width - 12}px`;
@@ -311,6 +311,9 @@ function refreshHud(): void {
 export function tickMultiplayer(now: number): void {
   if (!racing || !game.race) return;
   for (const g of ghosts.values()) g.shownY += (g.y - g.shownY) * 0.35;
+  // Leave race: shown to a player who is out while others still race. The last player to crash goes
+  // to the results almost at once, so the button waits half a second before it appears.
+  leaveRaceButton.hidden = !(game.status === 'crashed' && !game.courseStopped && game.now - game.crashedAt > LEAVE_BUTTON_DELAY_MS);
   if (game.courseStopped) game.invalidate(); // keep drawing through the pause (the last crash's flash, ghosts settling)
   if (game.status === 'running' && now - lastSend >= SEND_EVERY_MS) {
     lastSend = now;

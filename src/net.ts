@@ -1,7 +1,7 @@
 // The connection to the host's relay server (server/host.mjs). Messages are small JSON objects.
 
 export interface PlayerInfo { id: number; name: string; racing: boolean; ready: boolean }
-export interface RankRow { id: number; name: string; score: number }
+export interface RankRow { id: number; name: string; score: number; left?: boolean }
 
 export type ServerMessage =
   | { t: 'welcome'; id: number }
