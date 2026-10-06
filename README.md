@@ -36,7 +36,7 @@ obstacles and sees the others as faint dinos running just behind theirs; the hig
 GitHub Pages cannot connect devices to each other, so one person hosts from a laptop:
 
 ```sh
-git clone -b claude/multiplayer-lan https://github.com/ashikahmad/dino && cd dino && npm install && npm run host
+git clone https://github.com/ashikahmad/dino && cd dino && npm install && npm run host
 ```
 
 It prints an address and a QR code. Open the address on the laptop and choose **Play with
@@ -44,7 +44,7 @@ friends**; friends on the same Wi-Fi scan the code with their camera, or on a la
 (*Play with friends* → *Joining a friend?*). Everyone taps **I'm ready**; once all are ready, anyone can
 tap **Start race**. (The same steps are in the game, under *Play with friends*.)
 
-Needs Node 20.19+ or 22.12+. Run `npm install` again after switching branches.
+Needs Node 20.19+ or 22.12+. Run `npm install` again after pulling updates.
 
 Guest Wi-Fi networks often stop devices from seeing each other; use a normal network or a phone hotspot.
 `PORT=9000 npm run host` picks another port.
