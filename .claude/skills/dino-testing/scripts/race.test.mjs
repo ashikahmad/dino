@@ -1,6 +1,6 @@
 // Racing friends on the same Wi-Fi: lobby, ready-up, a shared course, crashes, results.
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
+import { after, afterEach, before, describe, it } from 'node:test';
 import WebSocket from 'ws';
 import { launch, openPage, sleep, startHost, startStatic } from './lib.mjs';
 
@@ -12,6 +12,12 @@ before(async () => {
 after(async () => {
   await browser?.close();
   host?.stop();
+});
+// a test that fails part way leaves its players in the one lobby; clear them so the next test starts empty
+afterEach(async () => {
+  const left = browser.contexts();
+  for (const c of left) await c.close();
+  if (left.length) await sleep(300);
 });
 
 /** Open the host's page and `friends` more pages that join through the QR-code link. */
@@ -44,7 +50,7 @@ describe('multiplayer race', () => {
   it('the lobby: ready-up, then anyone can start', async () => {
     const first = await openPage(browser, host.url);
     await first.click('#play-friends');
-    await first.waitForFunction(() => document.getElementById('mp').dataset.view === 'lobby');
+    await first.waitForFunction(() => document.getElementById('mp').dataset.view === 'lobby' && document.querySelectorAll('#mp-list li').length === 1);
     assert.match((await lobby(first)).notice, /Waiting for a friend/);
     assert.ok(await first.evaluate(() => !!document.querySelector('#qr svg')), 'a QR code to join');
 
@@ -233,6 +239,23 @@ describe('multiplayer race', () => {
       await sleep(300); // a crash would happen here
       ws.terminate();
     }
+    // and from a player turned away because the race is full, while the host closes the connection
+    const six = [];
+    for (let i = 0; i < 6; i++) {
+      const ws = new WebSocket(wsUrl);
+      await new Promise((ok, fail) => {
+        ws.once('open', ok);
+        ws.once('error', fail);
+      });
+      six.push(ws);
+    }
+    const late = new WebSocket(wsUrl);
+    late.on('error', () => {});
+    await new Promise((ok) => late.once('open', ok));
+    late.send('x'.repeat(5000));
+    await sleep(300);
+    for (const ws of [...six, late]) ws.terminate();
+    await sleep(300);
     const res = await fetch(`${host.url}/lan.json`);
     assert.ok(res.ok, 'the host is still running');
     const p = await openPage(browser, `${host.url}/?join`);

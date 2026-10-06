@@ -96,6 +96,9 @@ const num = (v, lo, hi) => (Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) :
 const cleanName = (n) => String(n ?? '').replace(/[^\p{L}\p{N} _.-]/gu, '').trim().slice(0, 14);
 
 wss.on('connection', (ws) => {
+  // a bad frame (too big, say) closes this connection; without a listener it would stop the host.
+  // First thing, so it also covers a player being turned away below.
+  ws.on('error', () => {});
   if (players.size >= MAX_PLAYERS) {
     send(ws, { t: 'full', max: MAX_PLAYERS });
     ws.close();
@@ -106,9 +109,6 @@ wss.on('connection', (ws) => {
   players.set(id, me);
   send(ws, { t: 'welcome', id });
   announce();
-
-  // a bad frame (too big, say) closes this connection; without a listener it would stop the host
-  ws.on('error', () => {});
 
   ws.on('message', (data) => {
     let m;
