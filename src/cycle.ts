@@ -140,13 +140,13 @@ function arc(u: number): Body {
   return { x: cx - BODY_SIZE / 2, y: HORIZON + 2 - (HORIZON + 2 - CEILING) * h };
 }
 
-const SUN_LOW = hex('#d9784f'); // soft orange near the horizon
+const SUN_LOW = hex('#d7473a'); // red at sunrise and sunset
 const SUN_MID = hex('#e8b14f');
 const SUN_NOON = hex('#f3df9f'); // a bit whitish at noon
 export const MOON = hex('#ececec');
 
 function sunColor(h: number): RGB {
-  return mix(mix(SUN_LOW, SUN_MID, smooth(0, 0.3, h)), SUN_NOON, smooth(0.3, 0.9, h));
+  return mix(mix(SUN_LOW, SUN_MID, smooth(0.04, 0.3, h)), SUN_NOON, smooth(0.3, 0.9, h));
 }
 
 // ------------------------------------------------------------------ palette
