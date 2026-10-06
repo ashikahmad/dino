@@ -10,11 +10,13 @@ npm install        # Node 20.19+ or 22.12+
 npm run dev        # Vite dev server
 npm run build      # type-check (tsc) + production build into dist/
 npm run host       # build, then run the race host (server/host.mjs) on :8787; prints a QR code
-npm test           # browser tests (see the dino-testing skill); about 3 minutes
+npm test           # all browser tests (see the dino-testing skill); about 3 minutes
+npm run test:colors | test:gameplay | test:ui | test:race   # one area while you work
 ```
 
-Run `npm run build` and `npm test` before pushing. Use the `dino-testing` skill (`.claude/skills/dino-testing/`) to run,
-read or extend the tests.
+Run the area you touched while working (see the table in the `dino-testing` skill: colours → `test:colors`, rules/speed/drawing →
+`test:gameplay`, screens/buttons/touch → `test:ui`, multiplayer → `test:race`), then `npm run build` and `npm test` before pushing.
+The skill lives in `.claude/skills/dino-testing/`; CI runs the same tests and blocks the Pages deploy if they fail.
 
 ## Layout
 

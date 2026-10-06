@@ -8,7 +8,11 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "host": "vite build && node server/host.mjs",
-    "test": "node --test --test-concurrency=1 \".claude/skills/dino-testing/scripts/*.test.mjs\""
+    "test": "node --test --test-concurrency=1 .claude/skills/dino-testing/scripts/palette.test.mjs .claude/skills/dino-testing/scripts/physics.test.mjs .claude/skills/dino-testing/scripts/motion.test.mjs .claude/skills/dino-testing/scripts/solo.test.mjs .claude/skills/dino-testing/scripts/layout.test.mjs .claude/skills/dino-testing/scripts/race.test.mjs",
+    "test:colors": "node --test --test-concurrency=1 .claude/skills/dino-testing/scripts/palette.test.mjs",
+    "test:gameplay": "node --test --test-concurrency=1 .claude/skills/dino-testing/scripts/physics.test.mjs .claude/skills/dino-testing/scripts/motion.test.mjs",
+    "test:ui": "node --test --test-concurrency=1 .claude/skills/dino-testing/scripts/solo.test.mjs .claude/skills/dino-testing/scripts/layout.test.mjs",
+    "test:race": "node --test --test-concurrency=1 .claude/skills/dino-testing/scripts/race.test.mjs"
   },
   "dependencies": {
     "twgl.js": "^7.0.0"
