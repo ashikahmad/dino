@@ -16,7 +16,7 @@ export function initPanel(g: Game, room: () => Room): void {
 }
 
 /** The About card is one tap away after a crash, and on the start screen when that screen cannot show everything. */
-export const aboutReachable = () => game.status === 'crashed' || (game.status === 'idle' && getRoom() !== 'full');
+export const aboutReachable = () => (game.status === 'crashed' && !game.race) || (game.status === 'idle' && getRoom() !== 'full');
 
 const infoButton = document.getElementById('info') as HTMLButtonElement;
 const closeButton = document.getElementById('close') as HTMLButtonElement;

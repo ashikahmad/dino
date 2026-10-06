@@ -16,6 +16,8 @@ export interface Ghost {
   shownY: number; // eased toward y, so it moves smoothly between updates
   score: number;
   alive: boolean;
+  slot: number; // how far behind the player's own dino it is drawn (in steps of 10 px)
+  diedAt: number; // where the course had scrolled to when it crashed
   jumping: boolean;
   ducking: boolean;
 }

@@ -4,7 +4,7 @@
 import { MOON, mix, palette, type Palette } from './cycle';
 import { VIEW_W, type Renderer, type RGB } from './renderer';
 import type { Sprite } from './sprites';
-import type { Obstacle } from './obstacles';
+import { DINO_W, type Obstacle } from './obstacles';
 import { applyTheme } from './theme';
 import { DINO_X, FLASH_MS, GROUND_W, type Cloud, type Ghost, type Star } from './world';
 
@@ -19,6 +19,10 @@ export interface GameView {
   readonly status: 'idle' | 'countdown' | 'running' | 'crashed';
   readonly countdown: number; // whole seconds before a race starts, else 0
   readonly ghosts: readonly Ghost[]; // the other players in a race
+  readonly race: boolean;
+  readonly travel: number; // how far the course has scrolled
+  readonly prevTravel: number;
+  readonly deathTravel: number; // ... when this player crashed
   readonly clock: number; // position on the day/night cycle
   readonly now: number;
   readonly crashedAt: number;
@@ -92,7 +96,7 @@ export class Scene {
 
     if (g.status === 'crashed') {
       r.draw(S.gameOver, Math.round((VIEW_W - 191) / 2), 42, pal.fg);
-      r.draw(S.restart, (VIEW_W - 36) / 2, 75, pal.fg);
+      if (!g.race) r.draw(S.restart, (VIEW_W - 36) / 2, 75, pal.fg); // a race ends for everyone together
     }
     r.flush();
   }
@@ -116,21 +120,27 @@ export class Scene {
     else if (g.jumping || g.status === 'idle') spr = S.dinoStand;
     else if (g.ducking) spr = g.animFrame ? S.duck2 : S.duck1;
     else spr = g.animFrame ? S.dinoRun2 : S.dinoRun1;
-    this.r.draw(spr, DINO_X, lerp(g.prevDinoY, g.dinoY, g.alpha), c);
+    // after a crash in a race the course runs on, so the dino is left behind as it scrolls past
+    const x = g.status === 'crashed' && g.race ? DINO_X - (lerp(g.prevTravel, g.travel, g.alpha) - g.deathTravel) : DINO_X;
+    if (x > -DINO_W) this.r.draw(spr, x, lerp(g.prevDinoY, g.dinoY, g.alpha), c);
   }
 
-  /** The other players: faint dinos running just behind yours, one step further back each. */
+  /** The other players: faint dinos running just behind yours; one that crashed is left behind as the course scrolls. */
   private renderGhosts(g: GameView, c: RGB): void {
     const S = this.r.sprites;
-    let slot = 0;
+    const travel = lerp(g.prevTravel, g.travel, g.alpha);
     for (const o of g.ghosts) {
-      if (!o.alive) continue;
-      slot++;
+      const home = DINO_X - 10 * o.slot;
+      if (!o.alive) {
+        const x = home - (travel - o.diedAt);
+        if (x > -DINO_W) this.r.draw(S.dinoDead, x, o.shownY, c, 0.35);
+        continue;
+      }
       let spr: Sprite;
-      if (o.jumping || g.status !== 'running') spr = S.dinoStand;
+      if (o.jumping || g.status === 'countdown') spr = S.dinoStand;
       else if (o.ducking) spr = g.animFrame ? S.duck2 : S.duck1;
       else spr = g.animFrame ? S.dinoRun2 : S.dinoRun1;
-      this.r.draw(spr, DINO_X - 10 * slot, o.shownY, c, 0.35);
+      this.r.draw(spr, home, o.shownY, c, 0.35);
     }
   }
 

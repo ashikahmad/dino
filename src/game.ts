@@ -67,6 +67,11 @@ export class Game implements GameView {
   race = false;
   ghosts: Ghost[] = [];
   private countdownMs = 0;
+  // how far the course has scrolled (px), and where it was when this player crashed: the dino is left behind
+  travel = 0;
+  prevTravel = 0;
+  deathTravel = 0;
+  worldScore = 0; // the course's score: equal to `score` until the player crashes, then it carries on
   private rng: () => number = Math.random; // drives the obstacles only; clouds and stars stay cosmetic
   /** Called once when the dino is hit, with the final score. */
   onCrash?: (score: number) => void;
@@ -118,7 +123,7 @@ export class Game implements GameView {
       this.dirty = false;
       return true;
     }
-    return this.state === 'running' || this.state === 'countdown';
+    return this.state === 'running' || this.state === 'countdown' || (this.state === 'crashed' && this.race);
   }
 
   /** Before the first run, start in the night for dark-mode users and in the day otherwise. */
@@ -131,6 +136,7 @@ export class Game implements GameView {
 
   get clock(): number {
     if (this.state !== 'crashed') return this.clockBase + this.score;
+    if (this.race) return this.clockBase + this.worldScore; // the sky follows the course, which goes on
     const k = this.nudgeT / NUDGE_MS;
     const ease = 1 - (1 - k) ** 3;
     return this.crashClock + (this.nudgeTo - this.crashClock) * ease;
@@ -140,6 +146,7 @@ export class Game implements GameView {
   skipTo(points: number): void {
     this.distance = points / SCORE_COEFFICIENT;
     this.score = points;
+    this.worldScore = points;
     this.milestone = Math.floor(points / 100);
     this.dirty = true;
   }
@@ -224,6 +231,8 @@ export class Game implements GameView {
     this.speed = START_SPEED;
     this.distance = 0;
     this.score = 0;
+    this.worldScore = 0;
+    this.travel = this.prevTravel = this.deathTravel = 0;
     this.runningTime = 0;
     this.obstacles = [];
     this.lastTypes = [];
@@ -249,7 +258,8 @@ export class Game implements GameView {
       // after a hit the negative flash and the sky nudge are all that move; draw them (and the frame that ends them)
       if (this.nudgeT < NUDGE_MS || this.now - this.crashedAt <= FLASH_MS + dtMs) this.dirty = true;
       this.nudgeT = Math.min(NUDGE_MS, this.nudgeT + dtMs);
-      return;
+      if (!this.race) return;
+      // in a race the course keeps running behind the Game Over screen, so you see the others play on
     }
     if (this.state === 'countdown') {
       this.countdownMs -= dtMs;
@@ -259,17 +269,18 @@ export class Game implements GameView {
       }
       return;
     }
-    if (this.state !== 'running') return; // the idle screen is frozen
+    if (this.state !== 'running' && !(this.state === 'crashed' && this.race)) return; // the idle screen is frozen
 
     // The simulation advances in fixed 60 Hz steps, so every step moves things by exactly the
     // same distance whatever the frame times are. Drawing blends between the last two steps (alpha).
     this.accumulator += dtMs;
-    for (let n = 0; this.accumulator >= FRAME_MS && n < 6 && this.state === 'running'; n++) {
+    const stepping = () => this.state === 'running' || (this.state === 'crashed' && this.race);
+    for (let n = 0; this.accumulator >= FRAME_MS && n < 6 && stepping(); n++) {
       this.accumulator -= FRAME_MS;
       this.rememberPositions();
       this.step();
     }
-    this.alpha = this.state === 'running' ? Math.min(1, this.accumulator / FRAME_MS) : 1;
+    this.alpha = stepping() ? Math.min(1, this.accumulator / FRAME_MS) : 1;
   }
 
   /** Where things were before the latest step, for drawing between steps. */
@@ -277,6 +288,7 @@ export class Game implements GameView {
     this.prevGroundX = this.groundX;
     this.prevStarDrift = this.starDrift;
     this.prevDinoY = this.dinoY;
+    this.prevTravel = this.travel;
     for (const o of this.obstacles) o.prevX = o.x;
     for (const c of this.clouds) c.prevX = c.x;
   }
@@ -284,24 +296,28 @@ export class Game implements GameView {
   private step(): void {
     const df = 1;
     const dtMs = FRAME_MS;
+    const alive = this.state === 'running'; // after a crash in a race only the world carries on
 
     this.updateClouds(df);
     this.starDrift = (this.starDrift + 0.3 * df) % VIEW_W;
 
     this.runningTime += dtMs;
     this.groundX = (this.groundX + this.speed * df) % GROUND_W;
-    this.updateDino(df, dtMs);
+    this.travel += this.speed * df;
+    if (alive) this.updateDino(df, dtMs);
 
     if (this.runningTime > CLEAR_TIME) this.updateObstacles(df, dtMs);
 
-    if (this.obstacles.length && this.collides()) {
+    if (alive && this.obstacles.length && this.collides()) {
       this.crash(true);
       return;
     }
 
     this.distance += this.speed * df;
-    this.score = Math.floor(this.distance * SCORE_COEFFICIENT);
+    this.worldScore = Math.floor(this.distance * SCORE_COEFFICIENT);
+    if (alive) this.score = this.worldScore; // the player's own score stops at the crash
     if (this.speed < MAX_SPEED) this.speed = Math.min(MAX_SPEED, this.speed + ACCELERATION * df);
+    if (!alive) return;
 
     const m = Math.floor(this.score / 100);
     if (m > this.milestone && m > 0) {
@@ -325,6 +341,7 @@ export class Game implements GameView {
     this.state = 'crashed';
     if (hit) this.sound.hit();
     this.crashedAt = this.now;
+    this.deathTravel = this.travel;
     this.flashOnCrash = hit && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.crashClock = this.clockBase + this.score;
     this.onCrash?.(this.score);

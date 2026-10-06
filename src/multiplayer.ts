@@ -14,10 +14,12 @@ const hud = $('hud');
 const nameInput = $<HTMLInputElement>('mp-name');
 const startButton = $<HTMLButtonElement>('mp-start');
 const readyButton = $<HTMLButtonElement>('mp-ready');
+const leaveRaceButton = $<HTMLButtonElement>('leave-race');
 const againButton = $<HTMLButtonElement>('mp-again');
 const NAME_KEY = 'dino-name';
 const SEND_EVERY_MS = 66; // how often we tell the others where we are
 const HUD_EVERY_MS = 250;
+const RESULTS_DELAY_MS = 1500;
 
 type View = 'guide' | 'lobby' | 'results' | 'error';
 
@@ -33,6 +35,7 @@ let racing = false; // this player is in a race
 const ghosts = new Map<number, Ghost>();
 let lastSend = 0;
 let lastHud = 0;
+let resultsTimer = 0;
 
 export const isMultiplayerOpen = () => root.classList.contains('open');
 
@@ -143,7 +146,9 @@ export function closeMultiplayer(): void {
 
 /** Stop racing and go back to the start screen. */
 function exitRace(): void {
+  window.clearTimeout(resultsTimer);
   racing = false;
+  leaveRaceButton.hidden = true;
   ghosts.clear();
   hud.hidden = true;
   if (game.race) game.leaveRace();
@@ -178,12 +183,13 @@ function handle(m: ServerMessage): void {
     }
     case 'dead': {
       const g = ghosts.get(m.id);
-      if (g) Object.assign(g, { alive: false, score: m.s });
+      if (g) Object.assign(g, { alive: false, score: m.s, diedAt: game.travel });
       refreshHud();
       break;
     }
     case 'results':
-      showResults(m.ranking);
+      // a short pause, so the last crash can be seen before the scores replace it
+      resultsTimer = window.setTimeout(() => showResults(m.ranking), RESULTS_DELAY_MS);
       break;
     case 'full':
       showError(`This race is full (${m.max} players).`);
@@ -194,9 +200,10 @@ function handle(m: ServerMessage): void {
 function beginRace(seed: number, startIn: number): void {
   racing = true;
   ghosts.clear();
+  let slot = 0;
   for (const p of players) {
     if (p.id === me) continue;
-    ghosts.set(p.id, { id: p.id, name: p.name, y: DINO_GROUND_Y, shownY: DINO_GROUND_Y, score: 0, alive: true, jumping: false, ducking: false });
+    ghosts.set(p.id, { id: p.id, name: p.name, y: DINO_GROUND_Y, shownY: DINO_GROUND_Y, score: 0, alive: true, slot: ++slot, diedAt: 0, jumping: false, ducking: false });
   }
   game.ghosts = [...ghosts.values()];
   root.classList.remove('open');
@@ -208,6 +215,7 @@ function beginRace(seed: number, startIn: number): void {
 
 function showResults(ranking: RankRow[]): void {
   racing = false;
+  leaveRaceButton.hidden = true;
   hud.hidden = true;
   const list = $('mp-ranking');
   list.replaceChildren(
@@ -268,6 +276,9 @@ const pad = (n: number) => String(Math.min(Math.floor(n), 99999)).padStart(5, '0
 function refreshHud(): void {
   const rect = canvas.getBoundingClientRect();
   // above the canvas when there is room (several rows would cover the playfield), else over its corner
+  // out of the race: the course carries on behind the Game Over screen, and you may leave
+  leaveRaceButton.hidden = !(racing && game.status === 'crashed');
+  leaveRaceButton.style.top = `${rect.bottom + 14}px`;
   hud.style.left = `${rect.left + 6}px`;
   hud.style.width = `${rect.width - 12}px`;
   if (rect.top >= 56) {
@@ -315,6 +326,8 @@ export function initMultiplayer(g: Game, c: HTMLCanvasElement): void {
 
   $('play-friends').addEventListener('click', () => void openMultiplayer());
   for (const id of ['mp-close', 'mp-leave', 'mp-leave2', 'mp-leave3']) $(id).addEventListener('click', closeMultiplayer);
+  leaveRaceButton.addEventListener('click', closeMultiplayer);
+  for (const type of ['pointerdown', 'pointerup']) leaveRaceButton.addEventListener(type, (e) => e.stopPropagation());
   $('mp-retry').addEventListener('click', () => {
     net.close();
     void (async () => {
