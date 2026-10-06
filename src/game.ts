@@ -295,25 +295,7 @@ export class Game implements GameView {
     if (this.runningTime > CLEAR_TIME) this.updateObstacles(df, dtMs);
 
     if (this.obstacles.length && this.collides()) {
-      this.state = 'crashed';
-      this.sound.hit();
-      this.crashedAt = this.now;
-      this.flashOnCrash = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      this.crashClock = this.clockBase + this.score;
-      this.onCrash?.(this.score);
-      this.nudgeTo = safeAfter(this.crashClock);
-      this.nudgeT = 0;
-      this.scoreFlashing = false;
-      this.jumping = false;
-      this.ducking = false;
-      if (this.score > this.highScore) {
-        this.highScore = this.score;
-        try {
-          localStorage.setItem('dino-hi', String(this.highScore));
-        } catch {
-          /* storage unavailable */
-        }
-      }
+      this.crash(true);
       return;
     }
 
@@ -336,6 +318,34 @@ export class Game implements GameView {
         if (++this.flashIter >= 3) this.scoreFlashing = false;
       }
     }
+  }
+
+  /** The run ends: the dino was hit (with the sound), or the player gave up (without it). */
+  private crash(hit: boolean): void {
+    this.state = 'crashed';
+    if (hit) this.sound.hit();
+    this.crashedAt = this.now;
+    this.flashOnCrash = hit && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.crashClock = this.clockBase + this.score;
+    this.onCrash?.(this.score);
+    this.nudgeTo = safeAfter(this.crashClock);
+    this.nudgeT = 0;
+    this.scoreFlashing = false;
+    this.jumping = false;
+    this.ducking = false;
+    if (this.score > this.highScore) {
+      this.highScore = this.score;
+      try {
+        localStorage.setItem('dino-hi', String(this.highScore));
+      } catch {
+        /* storage unavailable */
+      }
+    }
+  }
+
+  /** Leave a race in progress (the tab was hidden, so the game stopped moving): counts as out. */
+  forfeit(): void {
+    if (this.race && (this.state === 'running' || this.state === 'countdown')) this.crash(false);
   }
 
   private updateDino(df: number, dtMs: number): void {

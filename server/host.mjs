@@ -2,8 +2,8 @@
 // same Wi-Fi. Run with `npm run host`. There is one lobby; everyone who opens the address joins it.
 //
 // Messages (JSON):
-//   client -> server  hello {name}  name {name}  start  state {y, s, j, d}  dead {s}  lobby
-//   server -> client  welcome {id}  players {phase, hostId, list}  go {seed, startIn, racers}
+//   client -> server  hello {name}  name {name}  ready {on}  start  state {y, s, j, d}  dead {s}  lobby
+//   server -> client  welcome {id}  players {phase, list}  go {seed, startIn, racers}
 //                     state {id, y, s, j, d}  dead {id, s}  results {ranking}  full
 
 import { createServer } from 'node:http';
@@ -69,14 +69,12 @@ const send = (ws, msg) => ws.readyState === 1 && ws.send(JSON.stringify(msg));
 const broadcast = (msg, exceptId) => {
   for (const p of players.values()) if (p.id !== exceptId) send(p.ws, msg);
 };
-const hostId = () => players.keys().next().value ?? null; // the longest-connected player hosts
 
 function announce() {
   broadcast({
     t: 'players',
     phase,
-    hostId: hostId(),
-    list: [...players.values()].map((p) => ({ id: p.id, name: p.name, racing: p.racing })),
+    list: [...players.values()].map((p) => ({ id: p.id, name: p.name, racing: p.racing, ready: p.ready })),
   });
 }
 
@@ -102,7 +100,7 @@ wss.on('connection', (ws) => {
     return;
   }
   const id = nextId++;
-  const me = { id, ws, name: `Dino ${id}`, racing: false, alive: false, score: 0 };
+  const me = { id, ws, name: `Dino ${id}`, ready: false, racing: false, alive: false, score: 0 };
   players.set(id, me);
   send(ws, { t: 'welcome', id });
   announce();
@@ -122,10 +120,18 @@ wss.on('connection', (ws) => {
         announce();
         break;
       }
+      case 'ready':
+        if (phase === 'lobby') {
+          me.ready = m.on === true;
+          announce();
+        }
+        break;
       case 'start': {
-        if (id !== hostId() || phase !== 'lobby' || players.size < 2) break;
+        // anyone may start, once at least two players are in and everyone is ready
+        const all = [...players.values()];
+        if (phase !== 'lobby' || all.length < 2 || !all.every((p) => p.ready)) break;
         phase = 'racing';
-        for (const p of players.values()) Object.assign(p, { racing: true, alive: true, score: 0 });
+        for (const p of all) Object.assign(p, { ready: false, racing: true, alive: true, score: 0 });
         broadcast({ t: 'go', seed: (Math.random() * 2 ** 32) >>> 0, startIn: COUNTDOWN_MS, racers: players.size });
         announce();
         break;
@@ -145,9 +151,9 @@ wss.on('connection', (ws) => {
         }
         break;
       case 'lobby':
-        if (id === hostId() && phase === 'results') {
+        if (phase === 'results') {
           phase = 'lobby';
-          for (const p of players.values()) p.racing = false;
+          for (const p of players.values()) Object.assign(p, { racing: false, ready: false });
           announce();
         }
         break;
@@ -191,7 +197,8 @@ server.listen(PORT, '0.0.0.0', () => {
     return;
   }
   console.log(`  1. Open this on the computer you are hosting from:\n       ${found[0]}\n`);
-  console.log('  2. Friends on the same Wi-Fi scan this code with their camera:\n');
+  console.log('  2. Friends on the same Wi-Fi scan this code with their camera,');
+  console.log(`     or type this address in a browser:  ${found[0].replace('http://', '')}\n`);
   console.log(terminalQr(`${found[0]}?join`));
   if (found.length > 1) console.log(`\n  Other addresses: ${found.slice(1).join('  ')}`);
   console.log('\n  Press Ctrl+C to stop.\n');

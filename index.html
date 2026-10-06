@@ -103,7 +103,18 @@
       .plist li.me { border-color: currentColor; }
       .plist .tag { opacity: 0.6; font-size: 12px; }
       .plist.ranking li b { font-weight: 600; }
+      .cmd input, .joinbox input { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid currentColor; border-radius: 8px; background: transparent; color: inherit; font: 14px ui-monospace, "SF Mono", Menlo, Consolas, monospace; user-select: text; -webkit-user-select: text; }
+      .joinbox { display: grid; gap: 6px; width: 100%; text-align: left; padding-top: 14px; border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent); }
+      .joinbox small { opacity: 0.65; }
+      code.inline { padding: 1px 5px; font-size: 11px; display: inline; }
+      .joininfo { display: grid; gap: 8px; justify-items: start; }
+      .joininfo code { font-size: 15px; }
+      .joininfo .actions { justify-content: flex-start; }
+      .joininfo .pill { padding: 5px 12px; font-size: 13px; }
+      .notice { margin: 0; padding: 8px 14px; border-radius: 8px; background: color-mix(in srgb, currentColor 10%, transparent); font-weight: 500; }
+      .plist .tag.on { opacity: 1; font-weight: 600; }
       .pill.primary { opacity: 1; background: color-mix(in srgb, currentColor 14%, transparent); }
+      .pill[hidden] { display: none; }
       .pill:disabled { opacity: 0.4; cursor: default; }
       #mp .hint { min-height: 1.4em; }
       #hud { position: fixed; z-index: 3; pointer-events: none; display: flex; flex-wrap: wrap; gap: 0 16px; font: 12px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace; opacity: 0.85; }
@@ -159,26 +170,30 @@
         <div class="mp-view" data-for="guide">
           <ol class="steps">
             <li>On a laptop, open a terminal and run:
-              <div class="cmd"><code id="cmd">git clone https://github.com/ashikahmad/dino &amp;&amp; cd dino &amp;&amp; npm install &amp;&amp; npm run host</code><button class="pill" id="copy-cmd" type="button">Copy</button></div>
-              <small>Needs Node 20 or newer.</small></li>
+              <div class="cmd"><code id="cmd">git clone -b claude/multiplayer-lan https://github.com/ashikahmad/dino &amp;&amp; cd dino &amp;&amp; npm install &amp;&amp; npm run host</code><button class="pill" id="copy-cmd" type="button">Copy</button></div>
+              <small>Needs Node 20.19+ or 22.12+. If you switch branches later, run <code class="inline">npm install</code> again.</small></li>
             <li>It prints an address and a QR code. Open the address on the laptop and choose <b>Play with friends</b>.</li>
-            <li>Friends scan the QR code with their phone camera. When everyone is in, the first player taps <b>Start</b>.</li>
+            <li>Friends scan the QR code with their phone camera, or type the address. Everyone taps <b>I&rsquo;m ready</b>, then anyone taps <b>Start race</b>.</li>
           </ol>
           <p class="hint">Everyone needs to be on the same Wi-Fi. Guest networks often block this.</p>
+          <form class="joinbox" id="join-form">
+            <label for="join-addr">Joining a friend? Type the address they see:</label>
+            <div class="cmd"><input id="join-addr" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="192.168.1.23:8787" /><button class="pill primary" type="submit">Join</button></div>
+            <small id="join-note">Your browser may warn that the page is not secure; that is expected on a home network.</small>
+          </form>
         </div>
 
         <div class="mp-view" data-for="lobby">
-          <div class="join"><div class="qr" id="qr" role="img" aria-label="QR code to join"></div><div><p>Friends scan this to join:</p><code id="join-url"></code></div></div>
+          <div class="join"><div class="qr" id="qr" role="img" aria-label="QR code to join"></div><div class="joininfo"><p>Friends scan this, or open this address:</p><code id="join-url"></code><div class="actions"><button class="pill" id="copy-link" type="button">Copy link</button><button class="pill" id="share-link" type="button" hidden>Share</button></div></div></div>
           <label class="name">Your name <input id="mp-name" maxlength="14" autocomplete="off" spellcheck="false" /></label>
           <ul class="plist" id="mp-list"></ul>
-          <p class="hint" id="mp-status" aria-live="polite"></p>
-          <div class="actions"><button class="pill primary" id="mp-start" type="button">Start race</button><button class="pill" id="mp-leave" type="button">Leave</button></div>
+          <p class="notice" id="mp-status" aria-live="polite"></p>
+          <div class="actions"><button class="pill primary" id="mp-ready" type="button">I&rsquo;m ready</button><button class="pill primary" id="mp-start" type="button" hidden>Start race</button><button class="pill" id="mp-leave" type="button">Leave</button></div>
         </div>
 
         <div class="mp-view" data-for="results">
           <ol class="plist ranking" id="mp-ranking"></ol>
-          <p class="hint" id="mp-result-status" aria-live="polite"></p>
-          <div class="actions"><button class="pill primary" id="mp-again" type="button">Play again</button><button class="pill" id="mp-leave2" type="button">Leave</button></div>
+                    <div class="actions"><button class="pill primary" id="mp-again" type="button">Play again</button><button class="pill" id="mp-leave2" type="button">Leave</button></div>
         </div>
 
         <div class="mp-view" data-for="error">

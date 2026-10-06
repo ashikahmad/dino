@@ -13,6 +13,7 @@ const root = $('mp');
 const hud = $('hud');
 const nameInput = $<HTMLInputElement>('mp-name');
 const startButton = $<HTMLButtonElement>('mp-start');
+const readyButton = $<HTMLButtonElement>('mp-ready');
 const againButton = $<HTMLButtonElement>('mp-again');
 const NAME_KEY = 'dino-name';
 const SEND_EVERY_MS = 66; // how often we tell the others where we are
@@ -26,7 +27,6 @@ let host: HostInfo | null = null;
 const net = new Net();
 
 let me = 0;
-let hostId: number | null = null;
 let phase: 'lobby' | 'racing' | 'results' = 'lobby';
 let players: PlayerInfo[] = [];
 let racing = false; // this player is in a race
@@ -89,18 +89,53 @@ async function connect(): Promise<void> {
   showJoinCode();
 }
 
+let joinLink = '';
+
+/** Copy `text()` to the clipboard; plain-http pages have no clipboard API, so fall back to selecting it. */
+function wireCopy(button: HTMLButtonElement, text: () => string, label: string): void {
+  button.addEventListener('click', async () => {
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(text());
+      ok = true;
+    } catch {
+      const box = document.createElement('textarea');
+      box.value = text();
+      box.style.cssText = 'position:fixed;opacity:0;left:-100px';
+      document.body.append(box);
+      box.select();
+      try {
+        ok = document.execCommand('copy');
+      } catch {
+        /* not allowed */
+      }
+      box.remove();
+    }
+    button.textContent = ok ? 'Copied' : 'Select and copy';
+    window.setTimeout(() => (button.textContent = label), 1800);
+  });
+}
+
+/** Turn what a player typed ("192.168.1.23", "192.168.1.23:8787", "http://...") into the join link, or null. */
+export function joinTarget(input: string): string | null {
+  const bare = input.trim().replace(/^https?:\/\//i, '').replace(/[/?#].*$/, '');
+  const match = /^([A-Za-z0-9.-]+)(?::(\d{2,5}))?$/.exec(bare);
+  if (!match) return null;
+  return `http://${match[1]}:${match[2] ?? 8787}/?join`;
+}
+
 function showJoinCode(): void {
   if (!host) return;
   const local = ['localhost', '127.0.0.1'].includes(location.hostname);
   const base = local && host.urls[0] ? host.urls[0] : `${location.origin}/`;
-  $('qr').innerHTML = qrSvg(`${base}?join`);
+  joinLink = `${base}?join`;
+  $('qr').innerHTML = qrSvg(joinLink);
   $('join-url').textContent = base.replace(/^http:\/\//, '');
 }
 
 export function closeMultiplayer(): void {
   net.close();
   me = 0;
-  hostId = null;
   players = [];
   exitRace();
   root.classList.remove('open');
@@ -123,7 +158,6 @@ function handle(m: ServerMessage): void {
       break;
     case 'players':
       phase = m.phase;
-      hostId = m.hostId;
       players = m.list;
       if (m.phase === 'lobby') {
         if (racing || root.dataset.view === 'results') {
@@ -188,9 +222,6 @@ function showResults(ranking: RankRow[]): void {
       return li;
     }),
   );
-  const youHost = me === hostId;
-  againButton.hidden = !youHost;
-  $('mp-result-status').textContent = youHost ? '' : 'Waiting for the host to start another round…';
   setView('results');
   root.classList.add('open');
 }
@@ -205,23 +236,30 @@ function render(): void {
       const left = document.createElement('span');
       left.textContent = p.name + (p.id === me ? ' (you)' : '');
       const tag = document.createElement('span');
-      tag.className = 'tag';
-      tag.textContent = p.id === hostId ? 'host' : '';
+      tag.className = 'tag' + (p.ready ? ' on' : '');
+      tag.textContent = p.ready ? '✓ ready' : 'not ready';
       li.append(left, tag);
       return li;
     }),
   );
-  const youHost = me === hostId;
-  startButton.hidden = !youHost;
-  startButton.disabled = players.length < 2 || phase !== 'lobby';
+  const mine = players.find((p) => p.id === me);
+  const everyoneReady = players.length >= 2 && players.every((p) => p.ready);
+  const readyCount = players.filter((p) => p.ready).length;
+  // once everyone is ready, the Ready button gives way to Start (any player can press it)
+  readyButton.hidden = everyoneReady && phase === 'lobby';
+  startButton.hidden = !(everyoneReady && phase === 'lobby');
+  readyButton.disabled = phase !== 'lobby';
+  readyButton.textContent = mine?.ready ? 'Not ready' : 'I’m ready';
   $('mp-status').textContent =
     phase !== 'lobby'
       ? 'A race is under way. You will join the next one.'
-      : youHost
-        ? players.length < 2
-          ? 'Waiting for friends to join…'
-          : 'Everyone here? Start the race.'
-        : 'Waiting for the host to start…';
+      : players.length < 2
+        ? 'Waiting for a friend to join…'
+        : everyoneReady
+          ? 'Everyone is ready. Start the race!'
+          : mine?.ready
+            ? `${readyCount} of ${players.length} ready. Waiting for the others…`
+            : `${readyCount} of ${players.length} ready. Tap “I’m ready” when you are set.`;
 }
 
 // ---------------------------------------------------------------------- the race, per frame
@@ -285,18 +323,35 @@ export function initMultiplayer(g: Game, c: HTMLCanvasElement): void {
       else setView('guide');
     })();
   });
+  readyButton.addEventListener('click', () => {
+    const mine = players.find((p) => p.id === me);
+    net.send({ t: 'ready', on: !mine?.ready });
+  });
   startButton.addEventListener('click', () => net.send({ t: 'start' }));
   againButton.addEventListener('click', () => net.send({ t: 'lobby' }));
 
-  const copy = $<HTMLButtonElement>('copy-cmd');
-  copy.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText($('cmd').textContent ?? '');
-      copy.textContent = 'Copied';
-    } catch {
-      copy.textContent = 'Select and copy';
+  wireCopy($('copy-cmd') as HTMLButtonElement, () => $('cmd').textContent ?? '', 'Copy');
+  wireCopy($('copy-link') as HTMLButtonElement, () => joinLink, 'Copy link');
+  const shareLink = $<HTMLButtonElement>('share-link');
+  if (typeof navigator.share === 'function') {
+    shareLink.hidden = false;
+    shareLink.addEventListener('click', () => void navigator.share({ title: 'Dino race', text: 'Race me in Dino', url: joinLink }).catch(() => {}));
+  }
+
+  // typing the host's address (for a laptop without a camera)
+  $('join-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const target = joinTarget($<HTMLInputElement>('join-addr').value);
+    if (!target) {
+      $('join-note').textContent = 'That does not look like an address. It is numbers and dots, like 192.168.1.23:8787.';
+      return;
     }
-    window.setTimeout(() => (copy.textContent = 'Copy'), 1800);
+    location.href = target;
+  });
+
+  // a hidden tab stops moving, so its player could never finish: leaving the tab counts as being out
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && racing) game.forfeit();
   });
 
   nameInput.addEventListener('change', () => {

@@ -1,11 +1,11 @@
 // The connection to the host's relay server (server/host.mjs). Messages are small JSON objects.
 
-export interface PlayerInfo { id: number; name: string; racing: boolean }
+export interface PlayerInfo { id: number; name: string; racing: boolean; ready: boolean }
 export interface RankRow { id: number; name: string; score: number }
 
 export type ServerMessage =
   | { t: 'welcome'; id: number }
-  | { t: 'players'; phase: 'lobby' | 'racing' | 'results'; hostId: number | null; list: PlayerInfo[] }
+  | { t: 'players'; phase: 'lobby' | 'racing' | 'results'; list: PlayerInfo[] }
   | { t: 'go'; seed: number; startIn: number; racers: number }
   | { t: 'state'; id: number; y: number; s: number; j: boolean; d: boolean }
   | { t: 'dead'; id: number; s: number }
@@ -14,6 +14,7 @@ export type ServerMessage =
 
 export type ClientMessage =
   | { t: 'hello' | 'name'; name: string }
+  | { t: 'ready'; on: boolean }
   | { t: 'start' | 'lobby' }
   | { t: 'state'; y: number; s: number; j: boolean; d: boolean }
   | { t: 'dead'; s: number };
