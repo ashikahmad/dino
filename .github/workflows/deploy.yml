@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, claude/multiplayer-lan] # TEMPORARY: the multiplayer branch is live for testing; remove before merging
   workflow_dispatch:
 
 permissions:
