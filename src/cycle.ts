@@ -52,49 +52,73 @@ function sunState(p: number): Sun {
   return { a: DEEPEST * depth, h: 0, rising: untilRise < sinceSet, q };
 }
 
-type Stop = [number, string];
+// ------------------------------------------------------------------ colours
+//
+// One table serves both directions: the sky at a given altitude looks the same whether the sun
+// is going down or coming up. Colours are written in OKLCH (lightness, chroma, hue), where equal
+// chroma looks equally saturated at any hue, so the twilight colours differ in hue and lightness
+// but keep the same soft, flat saturation. The content (dino, cacti, text) is the sky's opposite
+// hue, so it stays distinct even where the two have similar brightness; by day it is near black
+// and by night near white.
 
-// Sky colour by sun altitude: evening (sun going down) ...
-const SETTING: Stop[] = [
-  [-0.3, '#202124'], // night
-  [-0.18, '#3a3858'],
-  [-0.08, '#6b4f72'], // dusk purple
-  [0.0, '#c8503f'], // sun just gone: ember
-  [0.06, '#e0866a'], // sun half behind the ground
-  [0.15, '#e8a27c'], // sun low, orange
-  [0.25, '#f0cfa6'],
-  [0.42, '#f6e6c4'], // afternoon
-  [0.6, '#f7f7f7'],
-  [1.0, '#f7f7f7'],
+type Lch = [number, number, number]; // lightness 0..1, chroma ~0..0.1, hue in degrees
+
+// altitude, sky, content lightness and chroma (the content's hue is the sky's plus 180)
+type Stop = [number, Lch, number, number];
+
+const STOPS: Stop[] = [
+  // hues run on past 0 (negative values) so the blend always takes the short way round the wheel
+  [-0.3, [0.24, 0.012, -95], 0.93, 0.006], // night: near black sky, near white content
+  [-0.22, [0.3, 0.04, -75], 0.9, 0.02],
+  [-0.15, [0.4, 0.05, -55], 0.88, 0.03], // dusk purple
+  [-0.08, [0.52, 0.06, -20], 0.85, 0.04], // dusty rose: the content turns light here
+  [-0.03, [0.6, 0.065, 10], 0.3, 0.04],
+  [0.0, [0.67, 0.068, 28], 0.28, 0.04], // the sun at the horizon: warm ember
+  [0.06, [0.76, 0.065, 42], 0.32, 0.038],
+  [0.15, [0.85, 0.055, 58], 0.36, 0.034], // low sun, peach
+  [0.27, [0.91, 0.04, 78], 0.4, 0.026],
+  [0.42, [0.95, 0.02, 92], 0.43, 0.012], // afternoon cream
+  [0.6, [0.975, 0.0, 95], 0.45, 0.0], // day: near white sky, near black content
+  [1.0, [0.975, 0.0, 95], 0.45, 0.0],
 ];
 
-// ... and morning (sun coming up): cooler and shorter than the evening.
-const RISING: Stop[] = [
-  [-0.3, '#202124'],
-  [-0.18, '#363a5a'], // pre-dawn blue
-  [-0.08, '#6a5f86'],
-  [0.0, '#d49aa0'], // first light, pink
-  [0.06, '#e9b39a'], // peach
-  [0.15, '#f0cdb0'],
-  [0.3, '#f4e3cd'],
-  [0.45, '#f7f7f7'],
-  [1.0, '#f7f7f7'],
-];
-
-const table = (stops: Stop[]) => stops.map(([a, c]) => [a, hex(c)] as [number, RGB]);
-const SETTING_RGB = table(SETTING);
-const RISING_RGB = table(RISING);
-
-function lookup(stops: [number, RGB][], a: number): RGB {
-  if (a <= stops[0][0]) return stops[0][1];
-  for (let i = 1; i < stops.length; i++) {
-    if (a <= stops[i][0]) {
-      const [a0, c0] = stops[i - 1];
-      const [a1, c1] = stops[i];
-      return mix(c0, c1, (a - a0) / (a1 - a0));
+/** OKLCH to sRGB (0..1), lowering chroma until the colour fits the screen's gamut. */
+function oklch(L: number, C: number, hDeg: number): RGB {
+  const h = (hDeg * Math.PI) / 180;
+  for (let k = 0; k < 24; k++) {
+    const a = C * Math.cos(h), b = C * Math.sin(h);
+    const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+    const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+    const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+    const lin = [
+      4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+      -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+      -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+    ];
+    if (lin.every((v) => v >= -0.0005 && v <= 1.0005) || k === 23) {
+      return lin.map((v) => {
+        const c = Math.min(1, Math.max(0, v));
+        return c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
+      }) as RGB;
     }
+    C *= 0.9;
   }
-  return stops[stops.length - 1][1];
+  return [0, 0, 0];
+}
+
+/** The sky and content colours for a sun altitude. */
+function colours(a: number): { sky: RGB; fg: RGB } {
+  let i = 1;
+  while (i < STOPS.length - 1 && a > STOPS[i][0]) i++;
+  const [a0, s0, fl0, fc0] = STOPS[i - 1];
+  const [a1, s1, fl1, fc1] = STOPS[i];
+  const t = Math.min(1, Math.max(0, (a - a0) / (a1 - a0)));
+  const lerp = (x: number, y: number) => x + (y - x) * t;
+  const hue = lerp(s0[2], s1[2]);
+  return {
+    sky: oklch(lerp(s0[0], s1[0]), lerp(s0[1], s1[1]), hue),
+    fg: oklch(lerp(fl0, fl1), lerp(fc0, fc1), hue + 180),
+  };
 }
 
 // ------------------------------------------------------------ sun & moon art
@@ -116,15 +140,13 @@ function arc(u: number): Body {
   return { x: cx - BODY_SIZE / 2, y: HORIZON + 2 - (HORIZON + 2 - CEILING) * h };
 }
 
-const SUN_RISE_LOW = hex('#d94f4f'); // slightly red at dawn
-const SUN_SET_LOW = hex('#d9532b'); // orange at sunset
-const SUN_MID = hex('#f2b233');
-const SUN_NOON = hex('#fbe28f'); // a bit whitish at noon
+const SUN_LOW = hex('#d9784f'); // soft orange near the horizon
+const SUN_MID = hex('#e8b14f');
+const SUN_NOON = hex('#f3df9f'); // a bit whitish at noon
 export const MOON = hex('#ececec');
 
-function sunColor(h: number, rising: boolean): RGB {
-  const low = rising ? SUN_RISE_LOW : SUN_SET_LOW;
-  return mix(mix(low, SUN_MID, smooth(0, 0.3, h)), SUN_NOON, smooth(0.3, 0.9, h));
+function sunColor(h: number): RGB {
+  return mix(mix(SUN_LOW, SUN_MID, smooth(0, 0.3, h)), SUN_NOON, smooth(0.3, 0.9, h));
 }
 
 // ------------------------------------------------------------------ palette
@@ -139,13 +161,6 @@ export interface Palette {
   moon: Body | null;
 }
 
-const FG_DAY = hex('#535353');
-const FG_DUSK = hex('#2a2328');
-const FG_NIGHT = hex('#e4e4e4');
-const DUSK_SWITCH = 0.0; // sun altitude at the middle of the dark -> light ease
-const DAWN_SWITCH = -0.05; // ... and of the light -> dark ease
-const SWITCH_SPAN = 0.05; // half-width of the ease, in altitude
-
 // The moon appears once the sky is properly dark and is gone before dawn, so it
 // is never up at the same time as the sun.
 const MOON_FROM = 0.075; // cycles after sunset
@@ -155,18 +170,8 @@ const MOON_TO = 1 - DAY - 0.06;
 export function palette(position: number): Palette {
   const p = (((position % CYCLE_POINTS) + CYCLE_POINTS) % CYCLE_POINTS) / CYCLE_POINTS;
   const s = sunState(p);
-  const sky = lookup(s.rising ? RISING_RGB : SETTING_RGB, s.a);
+  const { sky, fg } = colours(s.a);
   const lum = 0.2126 * sky[0] + 0.7152 * sky[1] + 0.0722 * sky[2];
-
-  // Sprites are dark shapes while there is sunlight and light shapes in the dark.
-  // The switch is a short ease tied to the sun, centred where the sky sits between
-  // the two sprite colours: at dusk as the sun slips behind the ground, at dawn as
-  // the first light appears (a little before sunrise).
-  const light = s.rising
-    ? 1 - smooth(DAWN_SWITCH - SWITCH_SPAN, DAWN_SWITCH + SWITCH_SPAN, s.a)
-    : 1 - smooth(DUSK_SWITCH - SWITCH_SPAN, DUSK_SWITCH + SWITCH_SPAN, s.a);
-  const dark = mix(FG_DUSK, FG_DAY, smooth(0.8, 0.95, lum));
-  const fg = mix(dark, FG_NIGHT, light);
 
   const sinceSet = s.q - DAY;
   const moonU = (sinceSet - MOON_FROM) / (MOON_TO - MOON_FROM);
@@ -177,7 +182,7 @@ export function palette(position: number): Palette {
     cloud: mix(sky, fg, 0.25),
     dim: mix(sky, fg, 0.75),
     night: Math.min(1, Math.max(0, (0.45 - lum) / 0.3)),
-    sun: s.h > 0 ? { ...arc(s.q / DAY), color: sunColor(s.h, s.rising) } : null,
+    sun: s.h > 0 ? { ...arc(s.q / DAY), color: sunColor(s.h) } : null,
     moon: moonU >= 0 && moonU <= 1 ? arc(moonU) : null,
   };
 }
