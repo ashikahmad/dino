@@ -107,6 +107,9 @@ wss.on('connection', (ws) => {
   send(ws, { t: 'welcome', id });
   announce();
 
+  // a bad frame (too big, say) closes this connection; without a listener it would stop the host
+  ws.on('error', () => {});
+
   ws.on('message', (data) => {
     let m;
     try {
@@ -114,6 +117,7 @@ wss.on('connection', (ws) => {
     } catch {
       return;
     }
+    if (!m || typeof m !== 'object') return;
     switch (m.t) {
       case 'hello':
       case 'name': {
@@ -174,8 +178,9 @@ wss.on('connection', (ws) => {
     } else if (phase === 'racing') {
       // someone who leaves mid-race keeps the result they had, and still appears in the ranking
       if (me.racing) leavers.push({ id, name: me.name, score: me.score, left: true });
+      // a player who already crashed was announced then, with where it happened; saying it again would move them
+      if (me.alive) broadcast({ t: 'dead', id, s: me.score });
       me.alive = false;
-      broadcast({ t: 'dead', id, s: me.score });
       finishIfDone();
     }
     announce();

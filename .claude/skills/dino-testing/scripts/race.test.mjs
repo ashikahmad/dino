@@ -1,6 +1,7 @@
 // Racing friends on the same Wi-Fi: lobby, ready-up, a shared course, crashes, results.
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
+import WebSocket from 'ws';
 import { launch, openPage, sleep, startHost, startStatic } from './lib.mjs';
 
 let host, pages, browser;
@@ -163,6 +164,8 @@ describe('multiplayer race', () => {
     await a.click('#leave-race');
     await sleep(400);
     assert.equal(await a.evaluate(() => window.dino.status), 'idle');
+    const after = await b.evaluate(() => window.dino.ghosts.find((g) => !g.alive));
+    assert.equal(after.diedAt, died.travel, 'leaving after a crash does not move the fallen dino');
 
     await vulnerable(b);
     await crashed(b);
@@ -192,6 +195,49 @@ describe('multiplayer race', () => {
     const next = await lobby(c);
     assert.deepEqual(next.tags, ['not ready', 'not ready']);
     await closeAll([a, b, c]);
+  });
+
+  it('the course keeps its pace through the step a player crashes on', async () => {
+    const [a, b] = await joinRace(1);
+    await readyAll([a, b]);
+    await a.evaluate(() => {
+      const g = window.dino;
+      const step = g.step.bind(g);
+      g.step = () => {
+        const speed = g.speed, distance = g.distance;
+        step();
+        if (g.status === 'crashed' && window.crashStep === undefined) window.crashStep = { gain: g.speed - speed, moved: g.distance - distance, speed };
+      };
+    });
+    try {
+      await a.click('#mp-start');
+      await crashed(a);
+      const s = await a.evaluate(() => window.crashStep);
+      assert.ok(s.gain > 0, `the speed still rises on the crash step (${s.gain})`);
+      assert.ok(Math.abs(s.moved - s.speed) < 1e-9, `the distance still advances on the crash step (${s.moved} vs ${s.speed})`);
+    } finally {
+      await closeAll([a, b]);
+    }
+  });
+
+  it('the host survives junk from a player', async () => {
+    const wsUrl = host.url.replace('http', 'ws') + '/ws';
+    for (const junk of ['null', 'x'.repeat(5000)]) {
+      const ws = new WebSocket(wsUrl);
+      await new Promise((ok, fail) => {
+        ws.once('open', ok);
+        ws.once('error', fail); // the host is gone
+      });
+      ws.on('error', () => {}); // the host may close this one for its junk
+      ws.send(junk);
+      await sleep(300); // a crash would happen here
+      ws.terminate();
+    }
+    const res = await fetch(`${host.url}/lan.json`);
+    assert.ok(res.ok, 'the host is still running');
+    const p = await openPage(browser, `${host.url}/?join`);
+    await p.waitForFunction(() => document.getElementById('mp').dataset.view === 'lobby' && document.querySelectorAll('#mp-list li').length >= 1);
+    await closeAll([p]);
   });
 
   it('a seventh player is turned away', async () => {

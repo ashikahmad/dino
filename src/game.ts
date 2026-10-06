@@ -319,16 +319,15 @@ export class Game implements GameView {
 
     if (this.runningTime > CLEAR_TIME) this.updateObstacles(df, dtMs);
 
-    if (alive && this.obstacles.length && this.collides()) {
-      this.crash(true);
-      return;
-    }
+    // the step still finishes after a hit: in a race every device's course must keep the same pace
+    if (alive && this.obstacles.length && this.collides()) this.crash(true);
+    const running = this.state === 'running';
 
     this.distance += this.speed * df;
     this.worldScore = Math.floor(this.distance * SCORE_COEFFICIENT);
-    if (alive) this.score = this.worldScore; // the player's own score stops at the crash
+    if (running) this.score = this.worldScore; // the player's own score stops at the crash
     if (this.speed < MAX_SPEED) this.speed = Math.min(MAX_SPEED, this.speed + ACCELERATION * df);
-    if (!alive) return;
+    if (!running) return;
 
     const m = Math.floor(this.score / 100);
     if (m > this.milestone && m > 0) {
