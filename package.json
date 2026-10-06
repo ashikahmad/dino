@@ -7,12 +7,14 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "host": "vite build && node server/host.mjs"
+    "host": "vite build && node server/host.mjs",
+    "test": "node --test --test-concurrency=1 \".claude/skills/dino-testing/scripts/*.test.mjs\""
   },
   "dependencies": {
     "twgl.js": "^7.0.0"
   },
   "devDependencies": {
+    "playwright-core": "^1.63.0",
     "qrcode-generator": "^2.0.4",
     "typescript": "^7.0.2",
     "vite": "^8.3.2",

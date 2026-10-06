@@ -78,6 +78,7 @@ async function connect(): Promise<void> {
   net.onMessage = handle;
   net.onClose = () => {
     if (!isMultiplayerOpen() && !racing) return;
+    if (root.dataset.view === 'error') return; // already explained (the race is full, say)
     exitRace();
     showError('The connection to the host was lost. Is it still running?');
     root.classList.add('open');

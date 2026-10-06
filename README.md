@@ -49,6 +49,10 @@ Needs Node 20.19+ or 22.12+. Run `npm install` again after pulling updates.
 Guest Wi-Fi networks often stop devices from seeing each other; use a normal network or a phone hotspot.
 `PORT=9000 npm run host` picks another port.
 
+## Tests
+
+`npm test` runs the browser tests in `.claude/skills/dino-testing/` (headless Chromium via Playwright; see the `SKILL.md` there). See `CLAUDE.md` for the project's rules and layout.
+
 ## Code layout
 
 | File | Role |
