@@ -122,12 +122,12 @@ export class Renderer {
   }
 
   /** Queue a sprite at a logical pixel position (snapped to the nearest device pixel). */
-  draw(s: Sprite, x: number, y: number, c: RGB, alpha = 1, flipX = false): void {
+  draw(s: Sprite, x: number, y: number, c: RGB, alpha = 1, flipX = false, scale = 1): void {
     if (this.count >= MAX_QUADS) return;
     // snap to a device pixel: the sprites stay sharp and slow motion moves in the finest steps the screen has
     x = Math.round(x * this.scale) * this.invScale;
     y = Math.round(y * this.scale) * this.invScale;
-    const x1 = x + s.w, y1 = y + s.h;
+    const x1 = x + s.w * scale, y1 = y + s.h * scale;
     let u0 = s.x * this.invW, u1 = (s.x + s.w) * this.invW;
     const v0 = s.y * this.invH, v1 = (s.y + s.h) * this.invH;
     if (flipX) {

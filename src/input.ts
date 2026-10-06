@@ -3,12 +3,18 @@
 
 import { toggleFullscreen, toggleMute } from './bar';
 import type { Game } from './game';
+import { closeMultiplayer, isMultiplayerOpen } from './multiplayer';
 import { aboutReachable, closeAbout, isAboutOpen, openAbout } from './panel';
 
 export function initInput(game: Game): void {
   const isJump = (e: KeyboardEvent) => e.code === 'Space' || e.code === 'ArrowUp';
 
   window.addEventListener('keydown', (e) => {
+    if (isMultiplayerOpen()) {
+      // the multiplayer card has its own buttons and a name box; keys must not reach the game
+      if (e.code === 'Escape') closeMultiplayer();
+      return;
+    }
     if (isAboutOpen()) {
       if (e.code === 'Escape' || e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyI') {
         e.preventDefault();
@@ -35,6 +41,7 @@ export function initInput(game: Game): void {
     }
   });
   window.addEventListener('keyup', (e) => {
+    if (isMultiplayerOpen()) return;
     if (isJump(e)) game.releaseJump();
     else if (e.code === 'ArrowDown') game.releaseDown();
   });

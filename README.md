@@ -28,6 +28,24 @@ Made by Ashik uddin Ahmad, with Claude.
 Sprite shapes, sizes, collision boxes and game constants follow Chromium's offline dino game
 (BSD-3-Clause, Copyright 2013 The Chromium Authors).
 
+## Race friends on your Wi-Fi
+
+Up to six players can race the same course, each on their own device. Everyone gets the same
+obstacles and sees the others as faint dinos running just behind theirs; the highest score wins.
+
+GitHub Pages cannot connect devices to each other, so one person hosts from a laptop:
+
+```sh
+git clone https://github.com/ashikahmad/dino && cd dino && npm install && npm run host
+```
+
+It prints an address and a QR code. Open the address on the laptop and choose **Play with
+friends**; friends on the same Wi-Fi scan the code with their camera. The first player is the host
+and taps **Start race** when everyone is in. (The same steps are in the game, under *Play with friends*.)
+
+Guest Wi-Fi networks often stop devices from seeing each other; use a normal network or a phone hotspot.
+`PORT=9000 npm run host` picks another port.
+
 ## Code layout
 
 | File | Role |
@@ -41,3 +59,5 @@ Sprite shapes, sizes, collision boxes and game constants follow Chromium's offli
 | `src/renderer.ts`, `src/sprites.ts`, `src/art.ts` | WebGL batching, atlas building, pixel art |
 | `src/input.ts`, `src/panel.ts`, `src/bar.ts` | Keyboard/touch input, start screen and About card, sound and fullscreen buttons |
 | `src/sound.ts` | Synthesised sound effects |
+| `src/multiplayer.ts`, `src/net.ts`, `src/qr.ts` | The race: guide, lobby, ghosts, scoreboard, results |
+| `server/host.mjs` | The host: serves the built game and relays messages between players |

@@ -3,7 +3,7 @@ import { DINO_BOXES, DINO_H, DINO_W, DUCK_BOXES, TYPES, TYPE_NAMES, obstacleBoxe
 import { VIEW_W } from './renderer';
 import type { GameView } from './scene';
 import { Sound } from './sound';
-import { DINO_GROUND_Y, DINO_X, FLASH_MS, GROUND_W, type Cloud, type Star } from './world';
+import { DINO_GROUND_Y, DINO_X, FLASH_MS, GROUND_W, seededRandom, type Cloud, type Ghost, type Star } from './world';
 
 // Constants follow the original Chrome game (units: px per 60Hz frame).
 const GRAVITY = 0.6;
@@ -24,9 +24,8 @@ const NUDGE_MS = 500; // game-over transition that steps the sky out of a low-co
 const MAX_CLOUDS = 6;
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
-const randInt = (a: number, b: number) => Math.floor(rand(a, b + 1));
 
-type State = 'idle' | 'running' | 'crashed';
+type State = 'idle' | 'countdown' | 'running' | 'crashed';
 
 export class Game implements GameView {
   readonly sound = new Sound();
@@ -63,6 +62,14 @@ export class Game implements GameView {
   groundX = 0;
   starDrift = 0;
   private cloudGap = 0;
+
+  // racing: everyone gets the same obstacles (a shared seed) and sees the others as ghosts
+  race = false;
+  ghosts: Ghost[] = [];
+  private countdownMs = 0;
+  private rng: () => number = Math.random; // drives the obstacles only; clouds and stars stay cosmetic
+  /** Called once when the dino is hit, with the final score. */
+  onCrash?: (score: number) => void;
 
   // score flash
   milestone = 0;
@@ -111,7 +118,7 @@ export class Game implements GameView {
       this.dirty = false;
       return true;
     }
-    return this.state === 'running';
+    return this.state === 'running' || this.state === 'countdown';
   }
 
   /** Before the first run, start in the night for dark-mode users and in the day otherwise. */
@@ -142,9 +149,10 @@ export class Game implements GameView {
   pressJump(): void {
     this.sound.unlock();
     if (this.state === 'crashed') {
-      if (this.now - this.crashedAt >= GAP_RESPAWN) this.restart();
+      if (!this.race && this.now - this.crashedAt >= GAP_RESPAWN) this.restart();
       return;
     }
+    if (this.state === 'countdown') return; // wait for the start
     if (this.state === 'idle') this.state = 'running';
     if (!this.jumping && !this.ducking) {
       this.jumping = true;
@@ -183,6 +191,36 @@ export class Game implements GameView {
   private restart(): void {
     this.clockBase = this.clock;
     this.state = 'running';
+    this.reset();
+  }
+
+  /** Get a race ready: same obstacles for everyone (from `seed`), then run once the countdown ends. */
+  startRace(seed: number, startInMs: number): void {
+    this.race = true;
+    this.rng = seededRandom(seed);
+    this.clockBase = 0; // everyone starts at the same time of day
+    this.state = 'countdown';
+    this.countdownMs = startInMs;
+    this.reset();
+  }
+
+  /** Back to the start screen after a race. */
+  leaveRace(): void {
+    this.race = false;
+    this.rng = Math.random;
+    this.ghosts = [];
+    this.state = 'idle';
+    this.clockBase = 0;
+    this.reset();
+    this.dirty = true;
+  }
+
+  /** Whole seconds left before a race starts (0 when not counting down). */
+  get countdown(): number {
+    return this.state === 'countdown' ? Math.ceil(this.countdownMs / 1000) : 0;
+  }
+
+  private reset(): void {
     this.speed = START_SPEED;
     this.distance = 0;
     this.score = 0;
@@ -211,6 +249,14 @@ export class Game implements GameView {
       // after a hit the negative flash and the sky nudge are all that move; draw them (and the frame that ends them)
       if (this.nudgeT < NUDGE_MS || this.now - this.crashedAt <= FLASH_MS + dtMs) this.dirty = true;
       this.nudgeT = Math.min(NUDGE_MS, this.nudgeT + dtMs);
+      return;
+    }
+    if (this.state === 'countdown') {
+      this.countdownMs -= dtMs;
+      if (this.countdownMs <= 0) {
+        this.state = 'running';
+        this.accumulator = 0;
+      }
       return;
     }
     if (this.state !== 'running') return; // the idle screen is frozen
@@ -254,6 +300,7 @@ export class Game implements GameView {
       this.crashedAt = this.now;
       this.flashOnCrash = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       this.crashClock = this.clockBase + this.score;
+      this.onCrash?.(this.score);
       this.nudgeTo = safeAfter(this.crashClock);
       this.nudgeT = 0;
       this.scoreFlashing = false;
@@ -337,15 +384,19 @@ export class Game implements GameView {
     }
   }
 
+  private randInt(a: number, b: number): number {
+    return Math.floor(a + this.rng() * (b - a + 1));
+  }
+
   private addObstacle(): void {
     const names = TYPE_NAMES.filter((n) => {
       if (TYPES[n].minSpeed > this.speed) return false;
       const l = this.lastTypes;
       return !(l.length >= 2 && l[l.length - 1] === n && l[l.length - 2] === n);
     });
-    const name = names[randInt(0, names.length - 1)];
+    const name = names[this.randInt(0, names.length - 1)];
     const type = TYPES[name];
-    const size = this.speed >= type.multipleSpeed ? randInt(1, 3) : 1;
+    const size = this.speed >= type.multipleSpeed ? this.randInt(1, 3) : 1;
     const width = size * type.w;
     const minGap = Math.round(width * this.speed + type.minGap * GAP_COEFFICIENT);
     this.obstacles.push({
@@ -353,9 +404,9 @@ export class Game implements GameView {
       size,
       x: VIEW_W,
       prevX: VIEW_W,
-      y: type.y[randInt(0, type.y.length - 1)],
-      gap: randInt(minGap, Math.round(minGap * 1.5)),
-      speedOffset: !type.grouped ? (Math.random() < 0.5 ? -0.8 : 0.8) : 0,
+      y: type.y[this.randInt(0, type.y.length - 1)],
+      gap: this.randInt(minGap, Math.round(minGap * 1.5)),
+      speedOffset: !type.grouped ? (this.rng() < 0.5 ? -0.8 : 0.8) : 0,
       frame: 0,
       frameTimer: 0,
       followed: false,

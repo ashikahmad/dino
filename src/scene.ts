@@ -6,7 +6,7 @@ import { VIEW_W, type Renderer, type RGB } from './renderer';
 import type { Sprite } from './sprites';
 import type { Obstacle } from './obstacles';
 import { applyTheme } from './theme';
-import { DINO_X, FLASH_MS, GROUND_W, type Cloud, type Star } from './world';
+import { DINO_X, FLASH_MS, GROUND_W, type Cloud, type Ghost, type Star } from './world';
 
 const HORIZON_Y = 127; // top of the ground sprite
 const GROUND_LINE_Y = 133; // the line itself: the sun and moon are cut off here
@@ -16,7 +16,9 @@ const MOON_FADE = 0.55; // the moon is blended less, so it reads a little bright
 
 /** What the scene needs to know about the game. */
 export interface GameView {
-  readonly status: 'idle' | 'running' | 'crashed';
+  readonly status: 'idle' | 'countdown' | 'running' | 'crashed';
+  readonly countdown: number; // whole seconds before a race starts, else 0
+  readonly ghosts: readonly Ghost[]; // the other players in a race
   readonly clock: number; // position on the day/night cycle
   readonly now: number;
   readonly crashedAt: number;
@@ -82,8 +84,11 @@ export class Scene {
       r.draw(spr, lerp(o.prevX, o.x, g.alpha), o.y, pal.fg);
     }
 
+    this.renderGhosts(g, pal.fg);
     this.renderDino(g, pal.fg);
     this.renderScore(g, pal.fg, pal.dim);
+
+    if (g.countdown > 0) this.renderCountdown(g.countdown, pal.fg);
 
     if (g.status === 'crashed') {
       r.draw(S.gameOver, Math.round((VIEW_W - 191) / 2), 42, pal.fg);
@@ -112,6 +117,29 @@ export class Scene {
     else if (g.ducking) spr = g.animFrame ? S.duck2 : S.duck1;
     else spr = g.animFrame ? S.dinoRun2 : S.dinoRun1;
     this.r.draw(spr, DINO_X, lerp(g.prevDinoY, g.dinoY, g.alpha), c);
+  }
+
+  /** The other players: faint dinos running just behind yours, one step further back each. */
+  private renderGhosts(g: GameView, c: RGB): void {
+    const S = this.r.sprites;
+    let slot = 0;
+    for (const o of g.ghosts) {
+      if (!o.alive) continue;
+      slot++;
+      let spr: Sprite;
+      if (o.jumping || g.status !== 'running') spr = S.dinoStand;
+      else if (o.ducking) spr = g.animFrame ? S.duck2 : S.duck1;
+      else spr = g.animFrame ? S.dinoRun2 : S.dinoRun1;
+      this.r.draw(spr, DINO_X - 10 * slot, o.shownY, c, 0.35);
+    }
+  }
+
+  /** A big 3, 2, 1 in the middle of the sky. */
+  private renderCountdown(n: number, c: RGB): void {
+    const glyph = this.r.sprites.glyphs[String(n)];
+    if (!glyph) return;
+    const k = 4;
+    this.r.draw(glyph, Math.round((VIEW_W - glyph.w * k) / 2), 34, c, 1, false, k);
   }
 
   private text(str: string, x: number, y: number, c: RGB): void {

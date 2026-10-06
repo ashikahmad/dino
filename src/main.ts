@@ -1,6 +1,7 @@
 import { initBar } from './bar';
 import { Game } from './game';
 import { initInput } from './input';
+import { initMultiplayer, tickMultiplayer } from './multiplayer';
 import { initPanel, syncPanel, type Room } from './panel';
 import { Renderer } from './renderer';
 import { Scene } from './scene';
@@ -33,6 +34,7 @@ resize();
 initBar(game, resize);
 initPanel(game, () => room);
 initInput(game);
+initMultiplayer(game, canvas);
 syncPanel();
 
 let last = performance.now();
@@ -44,6 +46,7 @@ const frame = (t: number) => {
     lastStatus = game.status;
     syncPanel(); // the panel only follows the game's state, so there is nothing to do on other frames
   }
+  tickMultiplayer(t);
   if (game.needsRender()) scene.render(game);
   requestAnimationFrame(frame);
 };
