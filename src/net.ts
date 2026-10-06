@@ -8,7 +8,7 @@ export type ServerMessage =
   | { t: 'players'; phase: 'lobby' | 'racing' | 'results'; list: PlayerInfo[] }
   | { t: 'go'; seed: number; startIn: number; racers: number }
   | { t: 'state'; id: number; y: number; s: number; j: boolean; d: boolean }
-  | { t: 'dead'; id: number; s: number }
+  | { t: 'dead'; id: number; s: number; y?: number; at?: number }
   | { t: 'results'; ranking: RankRow[] }
   | { t: 'full'; max: number };
 
@@ -17,7 +17,7 @@ export type ClientMessage =
   | { t: 'ready'; on: boolean }
   | { t: 'start' | 'lobby' }
   | { t: 'state'; y: number; s: number; j: boolean; d: boolean }
-  | { t: 'dead'; s: number };
+  | { t: 'dead'; s: number; y: number; at: number };
 
 /** What the host's `/lan.json` says; absent when the page is not served by the host (e.g. GitHub Pages). */
 export interface HostInfo { lan: true; max: number; urls: string[] }

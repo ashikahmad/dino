@@ -2,9 +2,9 @@
 // same Wi-Fi. Run with `npm run host`. There is one lobby; everyone who opens the address joins it.
 //
 // Messages (JSON):
-//   client -> server  hello {name}  name {name}  ready {on}  start  state {y, s, j, d}  dead {s}  lobby
+//   client -> server  hello {name}  name {name}  ready {on}  start  state {y, s, j, d}  dead {s, y, at}  lobby
 //   server -> client  welcome {id}  players {phase, list}  go {seed, startIn, racers}
-//                     state {id, y, s, j, d}  dead {id, s}  results {ranking}  full
+//                     state {id, y, s, j, d}  dead {id, s, y, at}  results {ranking}  full
 
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -146,7 +146,9 @@ wss.on('connection', (ws) => {
         if (phase === 'racing' && me.racing && me.alive) {
           me.alive = false;
           me.score = num(m.s, 0, 99999) || me.score;
-          broadcast({ t: 'dead', id, s: me.score });
+          // `at` is how far the course had scrolled when it happened: everyone's course is the same,
+          // so this places the crash exactly, whatever the network delay
+          broadcast({ t: 'dead', id, s: me.score, y: num(m.y, -200, 200), at: num(m.at, 0, 1e9) });
           finishIfDone();
         }
         break;

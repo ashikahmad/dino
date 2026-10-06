@@ -6,7 +6,7 @@ import { VIEW_W, type Renderer, type RGB } from './renderer';
 import type { Sprite } from './sprites';
 import { DINO_W, type Obstacle } from './obstacles';
 import { applyTheme } from './theme';
-import { DINO_X, FLASH_MS, GROUND_W, type Cloud, type Ghost, type Star } from './world';
+import { DINO_GROUND_Y, DINO_X, FLASH_MS, GROUND_W, type Cloud, type Ghost, type Star } from './world';
 
 const HORIZON_Y = 127; // top of the ground sprite
 const GROUND_LINE_Y = 133; // the line itself: the sun and moon are cut off here
@@ -48,6 +48,15 @@ export interface GameView {
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+/**
+ * A dino that has crashed no longer runs: it stays where it fell and the track carries it away.
+ * If it was in the air it drops onto the track first. `scrolled` is how far the course has moved since.
+ */
+function corpseY(y: number, scrolled: number): number {
+  const steps = scrolled / 8; // about how many steps that took
+  return Math.min(DINO_GROUND_Y, y + 0.3 * steps * steps);
+}
 /** Blend between two positions of something that wraps around at `period`. */
 const wrapLerp = (a: number, b: number, t: number, period: number) => lerp(a, b < a ? b + period : b, t) % period;
 
@@ -121,8 +130,8 @@ export class Scene {
     else if (g.ducking) spr = g.animFrame ? S.duck2 : S.duck1;
     else spr = g.animFrame ? S.dinoRun2 : S.dinoRun1;
     // after a crash in a race the course runs on, so the dino is left behind as it scrolls past
-    const x = g.status === 'crashed' && g.race ? DINO_X - (lerp(g.prevTravel, g.travel, g.alpha) - g.deathTravel) : DINO_X;
-    if (x > -DINO_W) this.r.draw(spr, x, lerp(g.prevDinoY, g.dinoY, g.alpha), c);
+    const left = g.status === 'crashed' && g.race ? lerp(g.prevTravel, g.travel, g.alpha) - g.deathTravel : 0;
+    if (DINO_X - left > -DINO_W) this.r.draw(spr, DINO_X - left, left > 0 ? corpseY(g.dinoY, left) : lerp(g.prevDinoY, g.dinoY, g.alpha), c);
   }
 
   /** The other players: faint dinos running just behind yours; one that crashed is left behind as the course scrolls. */
@@ -132,8 +141,9 @@ export class Scene {
     for (const o of g.ghosts) {
       const home = DINO_X - 10 * o.slot;
       if (!o.alive) {
-        const x = home - (travel - o.diedAt);
-        if (x > -DINO_W) this.r.draw(S.dinoDead, x, o.shownY, c, 0.35);
+        // where it crashed: at the obstacle, not in the staggered running position
+        const x = DINO_X - (travel - o.diedAt);
+        if (x > -DINO_W) this.r.draw(S.dinoDead, x, corpseY(o.shownY, travel - o.diedAt), c, 0.35);
         continue;
       }
       let spr: Sprite;

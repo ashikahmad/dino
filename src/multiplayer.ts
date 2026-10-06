@@ -183,7 +183,7 @@ function handle(m: ServerMessage): void {
     }
     case 'dead': {
       const g = ghosts.get(m.id);
-      if (g) Object.assign(g, { alive: false, score: m.s, diedAt: game.travel });
+      if (g) Object.assign(g, { alive: false, score: m.s, diedAt: m.at ?? game.travel, ...(m.y === undefined ? {} : { y: m.y, shownY: m.y }) });
       refreshHud();
       break;
     }
@@ -295,8 +295,12 @@ function refreshHud(): void {
   hud.replaceChildren(
     ...rows.map((r) => {
       const d = document.createElement('div');
-      d.className = (r.id === me ? 'me ' : '') + (r.alive ? '' : 'out');
-      d.textContent = `${r.name.slice(0, 10).padEnd(10)} ${pad(r.score)}`;
+      if (r.id === me) d.className = 'me';
+      // a small red cross marks a player who is out; the score stays readable
+      const mark = document.createElement('span');
+      mark.className = 'x';
+      mark.textContent = r.alive ? ' ' : '✕';
+      d.append(mark, ` ${r.name.slice(0, 10).padEnd(10)} ${pad(r.score)}`);
       return d;
     }),
   );
@@ -321,7 +325,7 @@ export function initMultiplayer(g: Game, c: HTMLCanvasElement): void {
   game = g;
   canvas = c;
   game.onCrash = (score) => {
-    if (racing) net.send({ t: 'dead', s: score });
+    if (racing) net.send({ t: 'dead', s: score, y: game.dinoY, at: game.travel });
   };
 
   $('play-friends').addEventListener('click', () => void openMultiplayer());
